@@ -243,7 +243,7 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """④ 센서 고르기 → 사이트에 기기를 만듦."""
         errors: dict[str, str] = {}
         placeholders = {"message": ""}
-        schema = _sensor_schema(self._where[CONF_TARGET], bool(self._hub.get("snapshot", True)), int(self._hub.get("interval_min") or 10))
+        schema = _sensor_schema(self._where[CONF_TARGET], bool(self._hub.get("snapshot", True)), int(self._hub.get("next_min") or self._hub.get("interval_min") or 10))
         if user_input is not None:
             if not _has_entity(user_input):
                 errors["base"] = "need_entity"
@@ -266,7 +266,11 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_DEVICE_ID: int(device.get("id") or 0),
                         CONF_TOKEN: device.get("token", ""),
                         CONF_PUSH_URL: device.get("push_url", ""),
-                        "interval_min": self._hub.get("interval_min"),
+                        "interval_min": self._hub.get("next_min") or self._hub.get("interval_min"),
+                        "send_mode": self._hub.get("send_mode"),
+                        "change_hum": self._hub.get("change_hum"),
+                        "change_temp": self._hub.get("change_temp"),
+                        "gap_sec": self._hub.get("gap_sec"),
                         "snap_gap_min": self._hub.get("snap_gap_min"),
                         "snap_max": self._hub.get("snap_max"),
                         "snapshot": bool(self._hub.get("snapshot", True)),
