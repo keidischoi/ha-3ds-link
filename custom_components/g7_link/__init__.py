@@ -94,6 +94,7 @@ class Pusher:
         self._unsubs: list[CALLBACK_TYPE] = []
         self._debounce: CALLBACK_TYPE | None = None
         self._last_snap = None
+        self._snap_ok = True  # 사이트가 「지금은 사진을 받지 않음」이라 하면 False (회원이 사이트를 안 보는 동안)
 
     @callback
     def start(self) -> None:
@@ -168,9 +169,32 @@ class Pusher:
             resp = await async_get_clientsession(self.hass).post(self.push_url, json=payload, timeout=_TIMEOUT)
             if resp.status >= 400:
                 _LOGGER.debug("G7 %s: 사이트가 받지 않음 (%s)", self.title, resp.status)
-            resp.release()
+                resp.release()
+                return
+            try:
+                answer = await resp.json(content_type=None)
+            except ValueError:
+                answer = None
+            if isinstance(answer, dict):
+                self._pace(answer)
         except (aiohttp.ClientError, TimeoutError) as err:
             _LOGGER.debug("G7 %s: 보내지 못함: %s", self.title, err)
+
+    @callback
+    def _pace(self, answer: dict[str, Any]) -> None:
+        """사이트의 답에 맞춰 다음 주기를 정함 — 회원이 사이트를 안 보는 동안에는 사이트가 느린 주기를 알려 줌."""
+        self._snap_ok = bool(answer.get("snap", True))
+        try:
+            site = int(answer.get("next_min") or 0)
+        except (TypeError, ValueError):
+            site = 0
+        if site < 1:
+            return
+        interval = max(site, int(self.conf.get(CONF_INTERVAL) or 0))
+        if interval != self.interval and self._unsub_interval is not None:
+            self.interval = interval
+            self._unsub_interval()
+            self._unsub_interval = async_track_time_interval(self.hass, self._tick, timedelta(minutes=interval))
 
     def _running(self) -> bool:
         """상태 엔티티가 없으면 늘 보냄, 있으면 가동 중일 때만."""
@@ -181,7 +205,7 @@ class Pusher:
 
     async def _push_snapshot(self) -> None:
         camera_entity = self.conf.get(CONF_CAMERA)
-        if not camera_entity or not self.push_url or not self.conf.get("snapshot", True) or not self._running():
+        if not camera_entity or not self.push_url or not self.conf.get("snapshot", True) or not self._snap_ok or not self._running():
             return
         now = dt_util.utcnow()
         if self._last_snap is not None and (now - self._last_snap) < timedelta(minutes=self.snap_gap):
