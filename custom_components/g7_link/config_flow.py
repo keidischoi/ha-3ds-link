@@ -20,6 +20,7 @@ from .const import (
     CONF_EQUIPMENT_ID,
     CONF_HUM,
     CONF_HUMIDITY_MAX,
+    CONF_INTERVAL,
     CONF_JOB,
     CONF_LOCATION,
     CONF_NAME,
@@ -87,19 +88,20 @@ async def _save(hass: HomeAssistant, site: str, code: str, device_id: int | None
     return data.get("device") or {}
 
 
-def _entity(domains: list[str], device_class: str | None = None) -> selector.EntitySelector:
+def _entity(domains: list[str], device_class: str | list[str] | None = None) -> selector.EntitySelector:
+    """엔티티 고르기 칸 — 종류(device_class)를 주면 그 종류의 센서만 목록에 나옴."""
     cfg: dict[str, Any] = {"domain": domains}
     if device_class:
         cfg["device_class"] = device_class
     return selector.EntitySelector(selector.EntitySelectorConfig(**cfg))
 
 
-def _sensor_schema(target: str, snapshot: bool) -> vol.Schema:
+def _sensor_schema(target: str, snapshot: bool, site_interval: int = 10) -> vol.Schema:
     """센서 고르기 칸 — 붙이는 곳에 맞는 것만."""
     fields: dict[Any, Any] = {
         vol.Optional(CONF_NAME): str,
-        vol.Optional(CONF_HUM): _entity(["sensor"]),
-        vol.Optional(CONF_TEMP): _entity(["sensor"]),
+        vol.Optional(CONF_HUM): _entity(["sensor"], ["humidity", "moisture"]),   # 습도 센서만
+        vol.Optional(CONF_TEMP): _entity(["sensor"], "temperature"),              # 온도 센서만
     }
     if target != "location":
         fields[vol.Optional(CONF_STATE)] = _entity(["sensor", "binary_sensor", "switch", "input_boolean", "light", "fan"])
@@ -111,6 +113,10 @@ def _sensor_schema(target: str, snapshot: bool) -> vol.Schema:
     fields[vol.Optional(CONF_HUMIDITY_MAX)] = number
     fields[vol.Optional(CONF_TEMP_MAX)] = selector.NumberSelector(
         selector.NumberSelectorConfig(min=-40, max=400, step=1, mode=selector.NumberSelectorMode.BOX)
+    )
+    low = max(1, int(site_interval or 10))
+    fields[vol.Optional(CONF_INTERVAL)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=low, max=max(low, 180), step=1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="min")
     )
     if snapshot:
         fields[vol.Optional(CONF_CAMERA)] = _entity(["camera"])
@@ -237,7 +243,7 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """④ 센서 고르기 → 사이트에 기기를 만듦."""
         errors: dict[str, str] = {}
         placeholders = {"message": ""}
-        schema = _sensor_schema(self._where[CONF_TARGET], bool(self._hub.get("snapshot", True)))
+        schema = _sensor_schema(self._where[CONF_TARGET], bool(self._hub.get("snapshot", True)), int(self._hub.get("interval_min") or 10))
         if user_input is not None:
             if not _has_entity(user_input):
                 errors["base"] = "need_entity"
@@ -288,7 +294,7 @@ class G7LinkOptionsFlow(config_entries.OptionsFlow):
         data = entry.data
         errors: dict[str, str] = {}
         placeholders = {"message": ""}
-        schema = _sensor_schema(data.get(CONF_TARGET, "other"), bool(data.get("snapshot", True)))
+        schema = _sensor_schema(data.get(CONF_TARGET, "other"), bool(data.get("snapshot", True)), int(data.get("interval_min") or 10))
         if user_input is not None:
             if not _has_entity(user_input):
                 errors["base"] = "need_entity"

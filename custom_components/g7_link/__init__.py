@@ -29,6 +29,7 @@ from .const import (
     CONF_CAMERA,
     CONF_CODE,
     CONF_DEVICE_ID,
+    CONF_INTERVAL,
     CONF_PUSH_URL,
     CONF_SITE,
     CONF_STATE,
@@ -84,7 +85,10 @@ class Pusher:
         self.conf: dict[str, Any] = {**entry.data, **entry.options}
         self.title = entry.title
         self.push_url: str = self.conf.get(CONF_PUSH_URL, "")
-        self.interval = max(1, int(self.conf.get("interval_min") or DEFAULT_INTERVAL_MIN))
+        # 보내는 주기 = 사이트가 정한 주기와 내가 고른 주기 중 긴 쪽 (사이트 것은 켤 때 다시 받아 옴)
+        self.site_interval = max(1, int(self.conf.get("interval_min") or DEFAULT_INTERVAL_MIN))
+        self.interval = max(self.site_interval, int(self.conf.get(CONF_INTERVAL) or 0))
+        self._unsub_interval: CALLBACK_TYPE | None = None
         self.snap_gap = max(1, int(self.conf.get("snap_gap_min") or DEFAULT_SNAP_GAP_MIN))
         self.snap_max = int(self.conf.get("snap_max") or DEFAULT_SNAP_MAX)
         self._unsubs: list[CALLBACK_TYPE] = []
@@ -93,7 +97,8 @@ class Pusher:
 
     @callback
     def start(self) -> None:
-        self._unsubs.append(async_track_time_interval(self.hass, self._tick, timedelta(minutes=self.interval)))
+        self._unsub_interval = async_track_time_interval(self.hass, self._tick, timedelta(minutes=self.interval))
+        self._unsubs.append(async_call_later(self.hass, 5, self._refresh_site))
         state_entity = self.conf.get(CONF_STATE)
         if state_entity:
             self._unsubs.append(async_track_state_change_event(self.hass, [state_entity], self._changed))
@@ -105,9 +110,34 @@ class Pusher:
         for unsub in self._unsubs:
             unsub()
         self._unsubs.clear()
+        if self._unsub_interval is not None:
+            self._unsub_interval()
+            self._unsub_interval = None
         if self._debounce is not None:
             self._debounce()
             self._debounce = None
+
+    async def _refresh_site(self, _now: Any = None) -> None:
+        """사이트가 정한 주기 · 사진 간격을 다시 받아 옴 — 관리자가 바꿨으면 그에 맞춤 (안 되면 예전 값 그대로)."""
+        url = f"{self.conf.get(CONF_SITE, '')}{HUB_PATH}{self.conf.get(CONF_CODE, '')}"
+        try:
+            resp = await async_get_clientsession(self.hass).get(url, timeout=_TIMEOUT)
+            if resp.status != 200:
+                resp.release()
+                return
+            data = await resp.json(content_type=None)
+        except (aiohttp.ClientError, TimeoutError, ValueError):
+            return
+        if not isinstance(data, dict) or not data.get("ok"):
+            return
+        self.snap_gap = max(1, int(data.get("snap_gap_min") or self.snap_gap))
+        site = max(1, int(data.get("interval_min") or self.site_interval))
+        interval = max(site, int(self.conf.get(CONF_INTERVAL) or 0))
+        self.site_interval = site
+        if interval != self.interval and self._unsub_interval is not None:
+            self.interval = interval
+            self._unsub_interval()
+            self._unsub_interval = async_track_time_interval(self.hass, self._tick, timedelta(minutes=interval))
 
     @callback
     def _changed(self, event: Event) -> None:

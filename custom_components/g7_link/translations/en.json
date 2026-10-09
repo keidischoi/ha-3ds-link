@@ -27,7 +27,7 @@
       },
       "sensors": {
         "title": "Pick sensors",
-        "description": "Pick only what you have. Values are sent every 10 minutes and right after the state changes. {message}",
+        "description": "Pick only what you have. Values are sent every interval (site default unless you set a longer one) and right after the state changes. {message}",
         "data": {
           "name": "Name (empty = the item picked above)",
           "ent_hum": "Humidity sensor",
@@ -39,7 +39,8 @@
           "humidity_max": "Alert when humidity is above (%)",
           "temp_max": "Alert when temperature is above (°C)",
           "camera": "Camera (one small picture while running)",
-          "snap_public": "Show the picture to other members of the site"
+          "snap_public": "Show the picture to other members of the site",
+          "interval": "Send interval (min) — empty = site default, cannot be shorter than the site default"
         }
       }
     },
@@ -57,7 +58,7 @@
     "step": {
       "init": {
         "title": "Change sensors and alert limits",
-        "description": "Pick only what you have. Values are sent every 10 minutes and right after the state changes. {message}",
+        "description": "Pick only what you have. Values are sent every interval (site default unless you set a longer one) and right after the state changes. {message}",
         "data": {
           "name": "Name (empty = the item picked above)",
           "ent_hum": "Humidity sensor",
@@ -69,7 +70,8 @@
           "humidity_max": "Alert when humidity is above (%)",
           "temp_max": "Alert when temperature is above (°C)",
           "camera": "Camera (one small picture while running)",
-          "snap_public": "Show the picture to other members of the site"
+          "snap_public": "Show the picture to other members of the site",
+          "interval": "Send interval (min) — empty = site default, cannot be shorter than the site default"
         }
       }
     },
