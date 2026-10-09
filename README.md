@@ -1,3 +1,5 @@
+<img src="custom_components/g7_link/brand/icon.png" alt="3ds 연결" width="96" align="right">
+
 # 3ds 연결 — Home Assistant 통합
 
 Home Assistant 의 온습도 센서 · 프린터/장비 상태 · 카메라 사진을 G7(그누보드7) 사이트의 **HA 연결** 플러그인(`custom-ha_link`)으로 보냅니다.
