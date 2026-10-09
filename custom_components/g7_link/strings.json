@@ -50,6 +50,13 @@
           "sensors": "Humidity sensors (pick several)",
           "humidity_max": "Alert when humidity is above (%) — only for newly created ones"
         }
+      },
+      "device": {
+        "title": "Pick the Home Assistant device",
+        "description": "Pick the printer or machine and its state, progress, remaining time and camera entities are filled in on the next screen (works with any integration: Bambu Lab, Creality, Anycubic, Moonraker, OctoPrint …). You can review and change them there. Skip to pick everything yourself.",
+        "data": {
+          "ha_device": "Device (optional)"
+        }
       }
     },
     "error": {

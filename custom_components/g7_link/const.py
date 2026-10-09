@@ -28,6 +28,7 @@ CONF_SNAP_PUBLIC = "snap_public"
 CONF_DEVICES = "devices"  # 한꺼번에 연결한 통합: 기기 여러 대 [{device_id, token, push_url, name, ent_hum, ent_temp}]
 CONF_BULK = "bulk"
 CONF_SENSORS = "sensors"
+CONF_HA_DEVICE = "ha_device"  # 설정 화면에서만 씀 — 고른 HA 기기에서 센서를 찾아 채움
 CONF_INTERVAL = "interval"  # 회원이 고른 보내는 주기 (분) — 사이트가 정한 주기보다 짧을 수 없음
 
 ENTITY_KEYS = (CONF_HUM, CONF_TEMP, CONF_STATE, CONF_PROGRESS, CONF_REMAINING, CONF_JOB)
@@ -53,5 +54,6 @@ SNAP_WIDTH = 640
 ON_STATES = {
     "on", "true", "1", "printing", "print", "running", "busy", "starting", "resuming", "prepare", "preparing",
     "heating", "paused", "pause", "pausing", "printing from sd", "working", "active", "heat", "drying",
+    "processing", "self-testing", "leveling", "calibrating", "homing",
 }
 SKIP_STATES = {"unknown", "unavailable", "none", ""}

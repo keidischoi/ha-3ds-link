@@ -50,6 +50,13 @@
           "sensors": "습도 센서 (여러 개 고르기)",
           "humidity_max": "습도가 이보다 높으면 알림 (%) — 새로 만드는 것에만"
         }
+      },
+      "device": {
+        "title": "Home Assistant 의 기기 고르기",
+        "description": "프린터 · 장비를 고르면 그 기기의 상태 · 진행률 · 남은 시간 · 카메라 센서를 찾아 다음 화면에 채워 드려요 (Bambu Lab · Creality · Anycubic · Moonraker · OctoPrint 등 어느 통합이든). 다음 화면에서 확인하고 고칠 수 있어요. 고르지 않고 넘어가면 직접 골라요.",
+        "data": {
+          "ha_device": "기기 (안 골라도 됨)"
+        }
       }
     },
     "error": {

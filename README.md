@@ -1,6 +1,6 @@
-<img src="custom_components/g7_link/brand/icon.png" alt="3ds 연결" width="96" align="right">
+<img src="custom_components/g7_link/brand/icon.png" alt="3ds" width="96" align="right">
 
-# 3ds 연결 — Home Assistant 통합
+# 3ds — Home Assistant 통합
 
 Home Assistant 의 온습도 센서 · 프린터/장비 상태 · 카메라 사진을 G7(그누보드7) 사이트의 **HA 연결** 플러그인(`custom-ha_link`)으로 보냅니다.
 설정 글(YAML)을 쓰지 않고, 화면에서 센서를 고르기만 하면 됩니다.
@@ -12,8 +12,8 @@ Home Assistant 의 온습도 센서 · 프린터/장비 상태 · 카메라 사�
 ## 설치 (HACS)
 
 1. HACS › 오른쪽 위 ⋮ › **사용자 지정 저장소** › `https://github.com/keidischoi/ha-3ds-link` · 종류 **통합** › 추가
-2. **3ds 연결** 을 내려받고 Home Assistant 를 다시 시작
-3. 설정 › 기기 및 서비스 › **통합 추가** › "3ds 연결"
+2. **3ds** 를 내려받고 Home Assistant 를 다시 시작
+3. 설정 › 기기 및 서비스 › **통합 추가** › "3ds"
 4. 사이트의 「HA 연결」 › 「➕ 기기 연결」에 나오는 **사이트 주소** 와 **연결 코드** 를 붙여 넣기
 5. 붙일 곳(필라멘트 보관함 · 내 프린터 · 업체 장비 · 그 밖)과 센서를 고르면 끝
 
@@ -21,6 +21,21 @@ Home Assistant 의 온습도 센서 · 프린터/장비 상태 · 카메라 사�
 
 프린터 · 장비를 더 붙이려면 3번부터 다시 하면 됩니다 (주소 · 코드는 채워져 있습니다).
 센서 · 알림 기준을 바꾸려면 통합의 **구성**을 누르세요. 통합을 지우면 사이트의 기기도 같이 지워집니다.
+
+## 프린터 통합
+
+어느 프린터 통합이든 됩니다 — 이 통합은 그 통합이 만든 **센서를 읽어 보내기만** 합니다.
+프린터 · 장비를 붙일 때 Home Assistant 의 **기기를 하나 고르면** 상태 · 진행률 · 남은 시간 · 작업 이름 · 내부 온도 · 카메라를 이름으로 찾아 채워 줍니다 (다음 화면에서 확인 · 고치기).
+
+| 통합 | 상태 센서 (예) | 비고 |
+|---|---|---|
+| Bambu Lab (ha-bambulab) | `…_print_status` | 진행률 · 남은 시간 · 작업 이름 · 카메라 |
+| Creality WebSocket (ha_creality_ws) | `…_print_status` | 상태: idle · processing · printing · paused · stopped · completed · error · self-testing |
+| Anycubic (Local · Cloud) | 상태 · 작업 센서 | 센서 이름은 통합 · 기종마다 다름 — 자동으로 못 찾으면 직접 고르기 |
+| Moonraker (Klipper) | `…_current_print_state` | 진행률 · 파일 이름 |
+| OctoPrint | `…_current_state` | 진행률 |
+
+자동으로 못 찾은 칸은 목록에서 직접 고르면 됩니다. 사이트가 모르는 상태 글은 「쉬는 중」으로 봅니다 — 그런 글이 있으면 알려 주세요.
 
 ## 보내는 값
 

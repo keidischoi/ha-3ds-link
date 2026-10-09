@@ -20,6 +20,7 @@ from .const import (
     CONF_DEVICE_ID,
     CONF_DEVICES,
     CONF_EQUIPMENT_ID,
+    CONF_HA_DEVICE,
     CONF_HUM,
     CONF_HUMIDITY_MAX,
     CONF_INTERVAL,
@@ -132,6 +133,43 @@ def _describe(hass: HomeAssistant, hum_entity: str) -> tuple[str, str]:
     return name[:40], temp
 
 
+# 프린터 통합마다 센서 이름이 달라서, 이름에 든 낱말로 찾음 (앞에 있는 낱말일수록 먼저). Bambu Lab · Creality WS · Anycubic · Moonraker · OctoPrint · PrusaLink 등
+_GUESS: dict[str, tuple[str, ...]] = {
+    CONF_STATE: ("print_status", "print_state", "current_print_state", "printer_state", "job_state", "current_state", "print_stage", "status", "state"),
+    CONF_PROGRESS: ("print_progress", "job_progress", "job_percentage", "progress", "percent"),
+    CONF_REMAINING: ("print_time_left", "time_left", "remaining_time", "time_remaining", "remaining", "eta"),
+    CONF_JOB: ("task_name", "job_name", "file_name", "filename", "gcode_file", "current_file", "print_job", "project_name"),
+    CONF_TEMP: ("chamber_temp", "box_temp", "enclosure_temp", "chamber"),
+    CONF_HUM: ("humidity",),
+}
+
+
+def _guess(hass: HomeAssistant, device_id: str) -> dict[str, str]:
+    """HA 기기 하나에서 상태 · 진행률 · 남은 시간 · 작업 이름 · 내부 온도 · 카메라 엔티티를 찾음. 못 찾은 것은 비워 둠."""
+    found: dict[str, str] = {}
+    try:
+        from homeassistant.helpers import entity_registry as er
+
+        entries = [e for e in er.async_entries_for_device(er.async_get(hass), device_id) if not e.disabled_by]
+    except Exception:  # noqa: BLE001 — 못 찾아도 손으로 고를 수 있음
+        return found
+    sensors = sorted((e.entity_id for e in entries if e.domain == "sensor"), key=len)
+    for key, words in _GUESS.items():
+        for word in words:
+            hit = next((e for e in sensors if word in e.split(".", 1)[-1] and e not in found.values()), None)
+            if hit:
+                found[key] = hit
+                break
+    if CONF_STATE not in found:  # 상태 센서가 없으면 전원 스위치 · 「출력 중」 이진 센서로
+        other = next((e.entity_id for e in entries if e.domain in ("binary_sensor", "switch") and any(w in e.entity_id for w in ("printing", "power", "plug", "state"))), None)
+        if other:
+            found[CONF_STATE] = other
+    camera = next((e.entity_id for e in entries if e.domain == "camera"), None)
+    if camera:
+        found[CONF_CAMERA] = camera
+    return found
+
+
 def _bulk_schema(default: list[str] | None = None) -> vol.Schema:
     return vol.Schema(
         {
@@ -208,6 +246,7 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._code = ""
         self._hub: dict[str, Any] = {}
         self._where: dict[str, Any] = {}
+        self._found: dict[str, str] = {}  # 고른 HA 기기에서 찾은 센서 (센서 고르기 칸에 미리 채움)
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         """① 사이트 주소 · 연결 코드."""
@@ -248,7 +287,7 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_bulk()
             self._where = {CONF_TARGET: user_input[CONF_TARGET]}
             if user_input[CONF_TARGET] == "other":
-                return await self.async_step_sensors()
+                return await self.async_step_device()
             return await self.async_step_where()
         schema = vol.Schema(
             {
@@ -317,7 +356,9 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._where[CONF_PRINTER_ID] = int(user_input[CONF_PRINTER_ID])
             else:
                 self._where[CONF_EQUIPMENT_ID] = int(user_input[CONF_EQUIPMENT_ID])
-            return await self.async_step_sensors()
+            if target == "location":
+                return await self.async_step_sensors()
+            return await self.async_step_device()
         if target == "location":
             locations = [str(x) for x in (self._hub.get("locations") or [])]
             field: Any = (
@@ -343,8 +384,17 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
         return self.async_show_form(step_id="where", data_schema=schema)
 
+    async def async_step_device(self, user_input: dict[str, Any] | None = None):
+        """④ (프린터 · 장비) Home Assistant 의 기기를 고르면 그 기기의 센서를 찾아 다음 화면에 채워 둠. 건너뛰어도 됨."""
+        if user_input is not None:
+            device_id = user_input.get(CONF_HA_DEVICE)
+            self._found = _guess(self.hass, str(device_id)) if device_id else {}
+            return await self.async_step_sensors()
+        schema = vol.Schema({vol.Optional(CONF_HA_DEVICE): selector.DeviceSelector(selector.DeviceSelectorConfig())})
+        return self.async_show_form(step_id="device", data_schema=schema)
+
     async def async_step_sensors(self, user_input: dict[str, Any] | None = None):
-        """④ 센서 고르기 → 사이트에 기기를 만듦."""
+        """⑤ 센서 고르기 → 사이트에 기기를 만듦."""
         errors: dict[str, str] = {}
         placeholders = {"message": ""}
         schema = _sensor_schema(self._where[CONF_TARGET], bool(self._hub.get("snapshot", True)), int(self._hub.get("next_min") or self._hub.get("interval_min") or 10))
@@ -383,6 +433,8 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     options = {k: v for k, v in user_input.items() if k != CONF_NAME}
                     return self.async_create_entry(title=str(device.get("name") or "G7"), data=data, options=options)
             schema = self.add_suggested_values_to_schema(schema, user_input)
+        elif self._found:
+            schema = self.add_suggested_values_to_schema(schema, self._found)
         return self.async_show_form(step_id="sensors", data_schema=schema, errors=errors, description_placeholders=placeholders)
 
     @staticmethod
