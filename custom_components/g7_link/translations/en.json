@@ -11,7 +11,7 @@
       },
       "target": {
         "title": "What is it attached to?",
-        "description": "With several temperature / humidity sensors, the first option is easiest. Printers and equipment are added one by one.",
+        "description": "The first option is the easiest. Use the one-by-one options for anything it could not find.",
         "data": {
           "target": "Attach to"
         }
@@ -57,6 +57,13 @@
         "data": {
           "ha_device": "Device (optional)"
         }
+      },
+      "auto": {
+        "title": "⚡ Find and connect",
+        "description": "Items whose names match your printers and filament storage locations on the site are pre-checked. If it looks right, just confirm.\n\n🖨️ Printers get state, progress, remaining time and camera; 🧵 storage gets humidity and temperature. Unchecked humidity sensors can be ticked to create a new storage. Unticking removes that connection. {message}",
+        "data": {
+          "items": "Connect"
+        }
       }
     },
     "error": {
@@ -66,7 +73,8 @@
       "rejected": "The site refused it (see the description above)."
     },
     "abort": {
-      "already_configured": "Already added — use Configure on that entry to pick more sensors."
+      "already_configured": "Already added — use Configure on that entry to pick more sensors.",
+      "nothing_found": "No matching printers or humidity sensors were found. Add the integration again and use the one-by-one options."
     }
   },
   "options": {
@@ -96,6 +104,13 @@
           "sensors": "Humidity sensors (pick several)",
           "humidity_max": "Alert when humidity is above (%) — only for newly created ones"
         }
+      },
+      "auto": {
+        "title": "⚡ Find and connect",
+        "description": "Items whose names match your printers and filament storage locations on the site are pre-checked. If it looks right, just confirm.\n\n🖨️ Printers get state, progress, remaining time and camera; 🧵 storage gets humidity and temperature. Unchecked humidity sensors can be ticked to create a new storage. Unticking removes that connection. {message}",
+        "data": {
+          "items": "Connect"
+        }
       }
     },
     "error": {
@@ -103,6 +118,10 @@
       "invalid_code": "The link code is not valid. Copy it again from the site.",
       "need_entity": "Pick at least one of humidity, temperature or state.",
       "rejected": "The site refused it (see the description above)."
+    },
+    "abort": {
+      "invalid_code": "The link code is not valid. Copy it again from the site.",
+      "cannot_connect": "Cannot reach the site. Check the address."
     }
   }
 }

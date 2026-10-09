@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import aiohttp
@@ -14,6 +15,7 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
+    CONF_AUTO,
     CONF_BULK,
     CONF_CAMERA,
     CONF_CODE,
@@ -24,7 +26,9 @@ from .const import (
     CONF_HUM,
     CONF_HUMIDITY_MAX,
     CONF_INTERVAL,
+    CONF_ITEMS,
     CONF_JOB,
+    CONF_KEY,
     CONF_LOCATION,
     CONF_NAME,
     CONF_PRINTER_ID,
@@ -174,6 +178,123 @@ def _guess(hass: HomeAssistant, device_id: str) -> dict[str, str]:
     return found
 
 
+def _norm(text: Any) -> str:
+    """이름 견주기용 — 소문자, 글자 · 숫자만 (빈칸 · 기호 무시)."""
+    return re.sub(r"[^0-9a-z가-힣]+", "", str(text or "").lower())
+
+
+def _scan(hass: HomeAssistant, hub: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """⚡ 알아서 찾기 — 사이트의 내 프린터 · 필라멘트 보관 위치와 이름이 맞는 HA 기기 · 습도 센서를 찾음.
+
+    돌려주는 것: {key: {label, matched, name, body(사이트에 만들 내용), conf(이 통합이 읽을 센서)}} — 이미 사이트에 연결한 것은 뺌.
+     - 프린터: 별명 · 기종 · 브랜드+기종이 HA 기기 이름/모델에 들어 있고, 그 기기에 상태 센서가 있으면 맞는 것 (가장 길게 맞는 기기)
+     - 보관함: 습도 센서(와 그 기기 · 구역 이름)에 필라멘트 보관 위치가 들어 있으면 그 위치로. 안 맞는 습도 센서도 목록에는 넣음 (체크는 꺼 둠)
+    """
+    out: dict[str, dict[str, Any]] = {}
+    existing = [d for d in (hub.get("devices") or []) if isinstance(d, dict)]
+    have_printers = {int(d.get("printer_id") or 0) for d in existing}
+    have_hum = {str((d.get("entities") or {}).get("hum") or "") for d in existing}
+    ent_reg = None
+    devices: list[Any] = []
+    try:
+        from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+        ent_reg = er.async_get(hass)
+        devices = list(dr.async_get(hass).devices.values())
+    except Exception:  # noqa: BLE001 — 기기 정보를 못 읽으면 프린터는 못 찾고 습도 센서만
+        devices = []
+    used: set[str] = set()
+    for p in hub.get("printers") or []:
+        pid = int(p.get("id") or 0)
+        if not pid or pid in have_printers:
+            continue
+        words = [w for w in (_norm(p.get("nickname")), _norm(p.get("model")), _norm(f"{p.get('brand', '')}{p.get('model', '')}")) if len(w) >= 2]
+        if not words:
+            words = [w for w in (_norm(p.get("name")),) if len(w) >= 2]
+        best: Any = None
+        best_found: dict[str, str] = {}
+        best_score = 0
+        for dev in devices:
+            if dev.id in used:
+                continue
+            text = _norm(f"{dev.name_by_user or ''} {dev.name or ''} {dev.model or ''}")
+            score = max((len(w) for w in words if w in text), default=0)
+            if score <= best_score:
+                continue
+            found = _guess(hass, dev.id)
+            if CONF_STATE not in found:
+                continue
+            best, best_found, best_score = dev, found, score
+        if best is None:
+            continue
+        used.add(best.id)
+        body: dict[str, Any] = {CONF_TARGET: "printer", CONF_PRINTER_ID: pid, CONF_NAME: "", CONF_HUMIDITY_MAX: "", CONF_TEMP_MAX: ""}
+        for key in ENTITY_KEYS:
+            body[key] = best_found.get(key, "")
+        out[f"p:{pid}"] = {
+            "label": f"🖨️ {p.get('name')}  ←  {best.name_by_user or best.name}",
+            "matched": True,
+            "name": str(p.get("name") or ""),
+            "body": body,
+            "conf": dict(best_found),
+        }
+    locations = sorted((str(x) for x in (hub.get("locations") or []) if len(_norm(x)) >= 2), key=len, reverse=True)
+    for state in hass.states.async_all("sensor"):
+        if state.attributes.get("device_class") not in ("humidity", "moisture"):
+            continue
+        ent = state.entity_id
+        if ent in have_hum:
+            continue
+        reg = ent_reg.async_get(ent) if ent_reg is not None else None
+        if reg is not None and reg.device_id in used:
+            continue  # 프린터 기기에 딸린 습도는 프린터 쪽에서 이미 씀
+        name, temp = _describe(hass, ent)
+        friendly = str(state.attributes.get("friendly_name") or ent)
+        text = _norm(f"{name} {friendly}")
+        loc = next((x for x in locations if _norm(x) in text or (len(_norm(name)) >= 2 and _norm(name) in _norm(x))), None)
+        place = loc or name
+        out[f"h:{ent}"] = {
+            "label": f"🧵 {loc}  ←  {friendly}" if loc else f"🧵 {friendly} (새 보관함: {name})",
+            "matched": loc is not None,
+            "name": place,
+            "body": {CONF_TARGET: "location", CONF_LOCATION: place, CONF_NAME: place, CONF_HUM: ent, CONF_TEMP: temp, CONF_HUMIDITY_MAX: 40},
+            "conf": {CONF_HUM: ent, **({CONF_TEMP: temp} if temp else {})},
+        }
+    return out
+
+
+def _item_key(device: dict[str, Any]) -> str:
+    """여러 대짜리 통합의 기기 하나를 가리는 이름 (예전 「한꺼번에」로 만든 것은 습도 센서로)."""
+    return str(device.get(CONF_KEY) or f"h:{device.get(CONF_HUM) or device.get(CONF_DEVICE_ID)}")
+
+
+def _items_schema(options: dict[str, str], default: list[str]) -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Required(CONF_ITEMS, default=default): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[selector.SelectOptionDict(value=k, label=v) for k, v in options.items()],
+                    multiple=True,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            )
+        }
+    )
+
+
+async def _connect(hass: HomeAssistant, site: str, code: str, key: str, cand: dict[str, Any]) -> dict[str, Any]:
+    """찾은 것 하나를 사이트에 만들고, 이 통합이 기억할 내용을 돌려줌."""
+    device = await _save(hass, site, code, None, cand["body"])
+    return {
+        CONF_KEY: key,
+        CONF_DEVICE_ID: int(device.get("id") or 0),
+        CONF_TOKEN: device.get("token", ""),
+        CONF_PUSH_URL: device.get("push_url", ""),
+        CONF_NAME: str(device.get("name") or cand.get("name") or ""),
+        **cand["conf"],
+    }
+
+
 def _pair(hass: HomeAssistant, sensors: dict[str, Any]) -> dict[str, Any]:
     """습도 센서만 고르고 온도 칸을 비워 뒀으면 같은 기기의 온도 센서를 같이 붙임 (온도를 직접 골랐으면 그대로)."""
     hum = sensors.get(CONF_HUM)
@@ -261,6 +382,7 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._hub: dict[str, Any] = {}
         self._where: dict[str, Any] = {}
         self._found: dict[str, str] = {}  # 고른 HA 기기에서 찾은 센서 (센서 고르기 칸에 미리 채움)
+        self._cands: dict[str, dict[str, Any]] = {}  # ⚡ 알아서 찾은 것
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         """① 사이트 주소 · 연결 코드."""
@@ -297,6 +419,8 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not self._hub.get("equipment"):
             targets.pop("equipment", None)
         if user_input is not None:
+            if user_input[CONF_TARGET] == CONF_AUTO:
+                return await self.async_step_auto()
             if user_input[CONF_TARGET] == CONF_BULK:
                 return await self.async_step_bulk()
             self._where = {CONF_TARGET: user_input[CONF_TARGET]}
@@ -305,9 +429,9 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_where()
         schema = vol.Schema(
             {
-                vol.Required(CONF_TARGET, default=CONF_BULK): selector.SelectSelector(
+                vol.Required(CONF_TARGET, default=CONF_AUTO): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[selector.SelectOptionDict(value=CONF_BULK, label="✨ 온습도 센서 여러 개를 한꺼번에 (필라멘트 · 레진 보관함)")]
+                        options=[selector.SelectOptionDict(value=CONF_AUTO, label="⚡ 알아서 찾아 연결 (추천) — 내 프린터 · 필라멘트 보관함과 이름이 맞는 것")]
                         + [selector.SelectOptionDict(value=k, label=str(v) + " — 하나씩") for k, v in targets.items()],
                         mode=selector.SelectSelectorMode.LIST,
                     )
@@ -315,6 +439,54 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }
         )
         return self.async_show_form(step_id="target", data_schema=schema)
+
+    async def async_step_auto(self, user_input: dict[str, Any] | None = None):
+        """③ ⚡ 알아서 찾아 연결 — 이름이 맞는 것을 체크해 보여 주고, 확인하면 한 번에 만듦."""
+        errors: dict[str, str] = {}
+        placeholders = {"message": ""}
+        await self.async_set_unique_id(f"{self._site}#bulk")
+        self._abort_if_unique_id_configured()
+        if not self._cands:
+            self._cands = _scan(self.hass, self._hub)
+        if not self._cands:
+            return self.async_abort(reason="nothing_found")
+        if user_input is not None:
+            devices: list[dict[str, Any]] = []
+            for key in user_input.get(CONF_ITEMS) or []:
+                cand = self._cands.get(key)
+                if cand is None:
+                    continue
+                try:
+                    devices.append(await _connect(self.hass, self._site, self._code, key, cand))
+                except InvalidCode:
+                    errors["base"] = "invalid_code"
+                    break
+                except CannotConnect:
+                    errors["base"] = "cannot_connect"
+                    break
+                except Rejected as err:
+                    errors["base"] = "rejected"
+                    placeholders["message"] = str(err)
+                    break
+            if devices:
+                data = {
+                    CONF_SITE: self._site,
+                    CONF_CODE: self._code,
+                    CONF_BULK: True,
+                    CONF_DEVICES: devices,
+                    "interval_min": self._hub.get("next_min") or self._hub.get("interval_min"),
+                    "send_mode": self._hub.get("send_mode"),
+                    "change_hum": self._hub.get("change_hum"),
+                    "change_temp": self._hub.get("change_temp"),
+                    "gap_sec": self._hub.get("gap_sec"),
+                    "snap_gap_min": self._hub.get("snap_gap_min"),
+                    "snap_max": self._hub.get("snap_max"),
+                    "snapshot": bool(self._hub.get("snapshot", True)),
+                }
+                return self.async_create_entry(title=f"3ds 기기 {len(devices)}개", data=data, options={})
+            errors.setdefault("base", "need_entity")
+        schema = _items_schema({k: c["label"] for k, c in self._cands.items()}, [k for k, c in self._cands.items() if c["matched"]])
+        return self.async_show_form(step_id="auto", data_schema=schema, errors=errors, description_placeholders=placeholders)
 
     async def async_step_bulk(self, user_input: dict[str, Any] | None = None):
         """③ 한꺼번에 — 습도 센서를 여러 개 고르면 센서마다 사이트에 보관함 기기를 만듦 (같은 기기의 온도 센서는 알아서 같이)."""
@@ -463,10 +635,58 @@ class G7LinkOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, entry: config_entries.ConfigEntry) -> None:
         self._entry = entry
+        self._cands: dict[str, dict[str, Any]] | None = None
+
+    async def async_step_auto(self, user_input: dict[str, Any] | None = None):
+        """여러 대짜리 통합의 구성 — 지금 연결한 것(체크됨) + 새로 찾은 것. 체크를 빼면 사이트에서도 지움."""
+        entry = self._entry
+        data = dict(entry.data)
+        site, code = data.get(CONF_SITE, ""), data.get(CONF_CODE, "")
+        devices: list[dict[str, Any]] = [d for d in (data.get(CONF_DEVICES) or []) if isinstance(d, dict)]
+        current = {_item_key(d): d for d in devices}
+        errors: dict[str, str] = {}
+        placeholders = {"message": ""}
+        if self._cands is None:
+            try:
+                hub = await _hub(self.hass, site, code)
+            except InvalidCode:
+                return self.async_abort(reason="invalid_code")
+            except CannotConnect:
+                return self.async_abort(reason="cannot_connect")
+            self._cands = {k: c for k, c in _scan(self.hass, hub).items() if k not in current}
+        if user_input is not None:
+            picked = [k for k in (user_input.get(CONF_ITEMS) or []) if k]
+            keep = [d for k, d in current.items() if k in picked]
+            for key in picked:
+                if key in current or key not in self._cands:
+                    continue
+                try:
+                    keep.append(await _connect(self.hass, site, code, key, self._cands[key]))
+                except InvalidCode:
+                    errors["base"] = "invalid_code"
+                    break
+                except CannotConnect:
+                    errors["base"] = "cannot_connect"
+                    break
+                except Rejected as err:
+                    errors["base"] = "rejected"
+                    placeholders["message"] = str(err)
+                    break
+            if not errors:
+                for key, gone in current.items():
+                    if key not in picked:
+                        await _delete(self.hass, site, code, int(gone.get(CONF_DEVICE_ID) or 0))
+                data[CONF_DEVICES] = keep
+                self.hass.config_entries.async_update_entry(entry, data=data, title=f"3ds 기기 {len(keep)}개")
+                return self.async_create_entry(title="", data=dict(entry.options))
+        options = {k: f"✔ {d.get(CONF_NAME) or k}" for k, d in current.items()}
+        options.update({k: c["label"] for k, c in self._cands.items()})
+        default = list(current) + [k for k, c in self._cands.items() if c["matched"]]
+        return self.async_show_form(step_id="auto", data_schema=_items_schema(options, default), errors=errors, description_placeholders=placeholders)
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         if self._entry.data.get(CONF_BULK):
-            return await self.async_step_bulk(user_input)
+            return await self.async_step_auto(user_input)
         entry = self._entry
         data = entry.data
         errors: dict[str, str] = {}
