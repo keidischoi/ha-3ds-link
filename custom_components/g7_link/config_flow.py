@@ -164,10 +164,24 @@ def _guess(hass: HomeAssistant, device_id: str) -> dict[str, str]:
         other = next((e.entity_id for e in entries if e.domain in ("binary_sensor", "switch") and any(w in e.entity_id for w in ("printing", "power", "plug", "state"))), None)
         if other:
             found[CONF_STATE] = other
+    if CONF_HUM in found and CONF_TEMP not in found:
+        _name, temp = _describe(hass, found[CONF_HUM])
+        if temp:
+            found[CONF_TEMP] = temp
     camera = next((e.entity_id for e in entries if e.domain == "camera"), None)
     if camera:
         found[CONF_CAMERA] = camera
     return found
+
+
+def _pair(hass: HomeAssistant, sensors: dict[str, Any]) -> dict[str, Any]:
+    """습도 센서만 고르고 온도 칸을 비워 뒀으면 같은 기기의 온도 센서를 같이 붙임 (온도를 직접 골랐으면 그대로)."""
+    hum = sensors.get(CONF_HUM)
+    if hum and not sensors.get(CONF_TEMP):
+        _name, temp = _describe(hass, str(hum))
+        if temp:
+            sensors = {**sensors, CONF_TEMP: temp}
+    return sensors
 
 
 def _bulk_schema(default: list[str] | None = None) -> vol.Schema:
@@ -399,6 +413,7 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         placeholders = {"message": ""}
         schema = _sensor_schema(self._where[CONF_TARGET], bool(self._hub.get("snapshot", True)), int(self._hub.get("next_min") or self._hub.get("interval_min") or 10))
         if user_input is not None:
+            user_input = _pair(self.hass, user_input)
             if not _has_entity(user_input):
                 errors["base"] = "need_entity"
             else:
@@ -458,6 +473,7 @@ class G7LinkOptionsFlow(config_entries.OptionsFlow):
         placeholders = {"message": ""}
         schema = _sensor_schema(data.get(CONF_TARGET, "other"), bool(data.get("snapshot", True)), int(data.get("interval_min") or 10))
         if user_input is not None:
+            user_input = _pair(self.hass, user_input)
             if not _has_entity(user_input):
                 errors["base"] = "need_entity"
             else:

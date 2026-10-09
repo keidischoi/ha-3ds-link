@@ -31,7 +31,7 @@
         "data": {
           "name": "Name (empty = the item picked above)",
           "ent_hum": "Humidity sensor",
-          "ent_temp": "Temperature sensor",
+          "ent_temp": "Temperature sensor (empty = the temperature sensor of the same device as the humidity sensor)",
           "ent_state": "State (printer status, power switch, plug)",
           "ent_progress": "Progress (%)",
           "ent_remaining": "Remaining time (min)",
@@ -77,7 +77,7 @@
         "data": {
           "name": "Name (empty = the item picked above)",
           "ent_hum": "Humidity sensor",
-          "ent_temp": "Temperature sensor",
+          "ent_temp": "Temperature sensor (empty = the temperature sensor of the same device as the humidity sensor)",
           "ent_state": "State (printer status, power switch, plug)",
           "ent_progress": "Progress (%)",
           "ent_remaining": "Remaining time (min)",
