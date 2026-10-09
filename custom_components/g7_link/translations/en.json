@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to your G7 site",
+        "title": "Connect to your 3ds site",
         "description": "Paste the two values shown under \"➕ Connect a device\" on the site's HA Link page.",
         "data": {
           "site": "Site address",

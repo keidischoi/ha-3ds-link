@@ -1,4 +1,4 @@
-# G7 Link (G7 연결) — Home Assistant 통합
+# 3ds 연결 — Home Assistant 통합
 
 Home Assistant 의 온습도 센서 · 프린터/장비 상태 · 카메라 사진을 G7(그누보드7) 사이트의 **HA 연결** 플러그인(`custom-ha_link`)으로 보냅니다.
 설정 글(YAML)을 쓰지 않고, 화면에서 센서를 고르기만 하면 됩니다.
@@ -9,8 +9,8 @@ Home Assistant 의 온습도 센서 · 프린터/장비 상태 · 카메라 사�
 ## 설치 (HACS)
 
 1. HACS › 오른쪽 위 ⋮ › **사용자 지정 저장소** › `https://github.com/keidischoi/ha-g7-link` · 종류 **통합** › 추가
-2. **G7 Link** 를 내려받고 Home Assistant 를 다시 시작
-3. 설정 › 기기 및 서비스 › **통합 추가** › "G7 Link"
+2. **3ds 연결** 을 내려받고 Home Assistant 를 다시 시작
+3. 설정 › 기기 및 서비스 › **통합 추가** › "3ds 연결"
 4. 사이트의 「HA 연결」 › 「➕ 기기 연결」에 나오는 **사이트 주소** 와 **연결 코드** 를 붙여 넣기
 5. 붙일 곳(필라멘트 보관함 · 내 프린터 · 업체 장비 · 그 밖)과 센서를 고르면 끝
 
