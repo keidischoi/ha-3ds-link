@@ -9,10 +9,10 @@
   ],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/keidischoi/ha-g7-link",
+  "documentation": "https://github.com/keidischoi/ha-3ds-link",
   "integration_type": "service",
   "iot_class": "cloud_push",
-  "issue_tracker": "https://github.com/keidischoi/ha-g7-link/issues",
+  "issue_tracker": "https://github.com/keidischoi/ha-3ds-link/issues",
   "requirements": [],
-  "version": "0.1.1"
+  "version": "0.1.2"
 }

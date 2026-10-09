@@ -8,7 +8,7 @@ Home Assistant 의 온습도 센서 · 프린터/장비 상태 · 카메라 사�
 
 ## 설치 (HACS)
 
-1. HACS › 오른쪽 위 ⋮ › **사용자 지정 저장소** › `https://github.com/keidischoi/ha-g7-link` · 종류 **통합** › 추가
+1. HACS › 오른쪽 위 ⋮ › **사용자 지정 저장소** › `https://github.com/keidischoi/ha-3ds-link` · 종류 **통합** › 추가
 2. **3ds 연결** 을 내려받고 Home Assistant 를 다시 시작
 3. 설정 › 기기 및 서비스 › **통합 추가** › "3ds 연결"
 4. 사이트의 「HA 연결」 › 「➕ 기기 연결」에 나오는 **사이트 주소** 와 **연결 코드** 를 붙여 넣기
