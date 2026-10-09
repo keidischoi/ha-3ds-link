@@ -1,0 +1,83 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "G7 사이트에 연결",
+        "description": "사이트의 「HA 연결」 화면에서 「➕ 기기 연결」을 누르면 나오는 두 가지를 붙여 넣어 주세요.",
+        "data": {
+          "site": "사이트 주소",
+          "code": "연결 코드"
+        }
+      },
+      "target": {
+        "title": "무엇에 붙일까요?",
+        "description": "이 통합 하나가 기기 하나예요. 더 붙이려면 통합을 한 번 더 추가하세요.",
+        "data": {
+          "target": "붙일 곳"
+        }
+      },
+      "where": {
+        "title": "어느 것인가요?",
+        "description": "필라멘트 보관함은 정비 수첩의 「보관 위치」와 같은 이름으로 적어 주세요.",
+        "data": {
+          "location": "보관 위치",
+          "printer_id": "내 프린터",
+          "equipment_id": "업체 장비"
+        }
+      },
+      "sensors": {
+        "title": "센서 고르기",
+        "description": "있는 것만 고르면 돼요. 값은 10분마다, 상태가 바뀌면 바로 보내요. {message}",
+        "data": {
+          "name": "이름 (비우면 위에서 고른 것)",
+          "ent_hum": "습도 센서",
+          "ent_temp": "온도 센서",
+          "ent_state": "상태 (프린터 상태 · 전원 스위치 · 플러그)",
+          "ent_progress": "진행률 (%)",
+          "ent_remaining": "남은 시간 (분)",
+          "ent_job": "작업 이름",
+          "humidity_max": "습도가 이보다 높으면 알림 (%)",
+          "temp_max": "온도가 이보다 높으면 알림 (°C)",
+          "camera": "카메라 (가동 중일 때 작은 사진 한 장)",
+          "snap_public": "사진을 사이트의 다른 회원에게 공개"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "사이트에 닿지 않아요. 주소를 확인해 주세요.",
+      "invalid_code": "연결 코드가 맞지 않아요. 사이트에서 다시 복사해 주세요.",
+      "need_entity": "습도 · 온도 · 상태 중 하나는 골라 주세요.",
+      "rejected": "사이트가 받지 않았어요 (위 설명을 봐 주세요)."
+    },
+    "abort": {
+      "already_configured": "이미 붙인 기기예요."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "센서 · 알림 기준 바꾸기",
+        "description": "있는 것만 고르면 돼요. 값은 10분마다, 상태가 바뀌면 바로 보내요. {message}",
+        "data": {
+          "name": "이름 (비우면 위에서 고른 것)",
+          "ent_hum": "습도 센서",
+          "ent_temp": "온도 센서",
+          "ent_state": "상태 (프린터 상태 · 전원 스위치 · 플러그)",
+          "ent_progress": "진행률 (%)",
+          "ent_remaining": "남은 시간 (분)",
+          "ent_job": "작업 이름",
+          "humidity_max": "습도가 이보다 높으면 알림 (%)",
+          "temp_max": "온도가 이보다 높으면 알림 (°C)",
+          "camera": "카메라 (가동 중일 때 작은 사진 한 장)",
+          "snap_public": "사진을 사이트의 다른 회원에게 공개"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "사이트에 닿지 않아요. 주소를 확인해 주세요.",
+      "invalid_code": "연결 코드가 맞지 않아요. 사이트에서 다시 복사해 주세요.",
+      "need_entity": "습도 · 온도 · 상태 중 하나는 골라 주세요.",
+      "rejected": "사이트가 받지 않았어요 (위 설명을 봐 주세요)."
+    }
+  }
+}

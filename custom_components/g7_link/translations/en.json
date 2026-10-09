@@ -1,0 +1,83 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to your G7 site",
+        "description": "Paste the two values shown under \"➕ Connect a device\" on the site's HA Link page.",
+        "data": {
+          "site": "Site address",
+          "code": "Link code"
+        }
+      },
+      "target": {
+        "title": "What is it attached to?",
+        "description": "One entry is one device. Add the integration again for more.",
+        "data": {
+          "target": "Attach to"
+        }
+      },
+      "where": {
+        "title": "Which one?",
+        "description": "For filament storage, use the same name as the storage location in the maintenance log.",
+        "data": {
+          "location": "Storage location",
+          "printer_id": "My printer",
+          "equipment_id": "Company equipment"
+        }
+      },
+      "sensors": {
+        "title": "Pick sensors",
+        "description": "Pick only what you have. Values are sent every 10 minutes and right after the state changes. {message}",
+        "data": {
+          "name": "Name (empty = the item picked above)",
+          "ent_hum": "Humidity sensor",
+          "ent_temp": "Temperature sensor",
+          "ent_state": "State (printer status, power switch, plug)",
+          "ent_progress": "Progress (%)",
+          "ent_remaining": "Remaining time (min)",
+          "ent_job": "Job name",
+          "humidity_max": "Alert when humidity is above (%)",
+          "temp_max": "Alert when temperature is above (°C)",
+          "camera": "Camera (one small picture while running)",
+          "snap_public": "Show the picture to other members of the site"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach the site. Check the address.",
+      "invalid_code": "The link code is not valid. Copy it again from the site.",
+      "need_entity": "Pick at least one of humidity, temperature or state.",
+      "rejected": "The site refused it (see the description above)."
+    },
+    "abort": {
+      "already_configured": "This device is already added."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Change sensors and alert limits",
+        "description": "Pick only what you have. Values are sent every 10 minutes and right after the state changes. {message}",
+        "data": {
+          "name": "Name (empty = the item picked above)",
+          "ent_hum": "Humidity sensor",
+          "ent_temp": "Temperature sensor",
+          "ent_state": "State (printer status, power switch, plug)",
+          "ent_progress": "Progress (%)",
+          "ent_remaining": "Remaining time (min)",
+          "ent_job": "Job name",
+          "humidity_max": "Alert when humidity is above (%)",
+          "temp_max": "Alert when temperature is above (°C)",
+          "camera": "Camera (one small picture while running)",
+          "snap_public": "Show the picture to other members of the site"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach the site. Check the address.",
+      "invalid_code": "The link code is not valid. Copy it again from the site.",
+      "need_entity": "Pick at least one of humidity, temperature or state.",
+      "rejected": "The site refused it (see the description above)."
+    }
+  }
+}

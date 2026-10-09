@@ -1,0 +1,18 @@
+{
+  "domain": "g7_link",
+  "name": "G7 Link",
+  "after_dependencies": [
+    "camera"
+  ],
+  "codeowners": [
+    "@keidischoi"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/keidischoi/ha-g7-link",
+  "integration_type": "service",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/keidischoi/ha-g7-link/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
