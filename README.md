@@ -9,7 +9,66 @@ Home Assistant 의 온습도 센서 · 프린터/장비 상태 · 카메라 사�
 - 사이트의 화면을 한동안 안 보면 사이트가 알려 주는 느린 주기로 스스로 늦춥니다 (상태 변화는 그대로 바로 보냄). 다시 화면을 열면 다음 번 보낼 때부터 평소 주기로 돌아옵니다.
 - 보내는 방식은 **사이트 관리자가 정합니다**: 「값이 변하면」(습도 · 온도가 정한 만큼 변했을 때, 1분에 한 번까지 + 변화가 없어도 가끔 한 번) 또는 「주기적으로」. 어느 쪽이든 상태가 바뀌면 조금 뒤 바로 한 번. 통합의 **구성**에서 주기를 더 길게 바꿀 수 있습니다 (사이트 기본보다 짧게는 안 됨). 카메라를 고르면 가동 중일 때만 작은 사진(가로 640) 한 장.
 
-## 설치 (HACS)
+## 그림으로 보는 설치 · 연결
+
+처음이면 5분이면 됩니다. 빨간 테두리와 번호를 순서대로 따라 하세요.
+(그림은 화면을 본떠 그린 것입니다. Home Assistant 화면은 버전에 따라 조금 다를 수 있습니다.)
+
+### 1. HACS 에 저장소 넣기
+
+HACS 를 열고 오른쪽 위 **⋮** → **사용자 지정 저장소** → 아래 주소를 붙여 넣고 종류는 **통합** → **추가**.
+
+```
+https://github.com/keidischoi/ha-3ds-link
+```
+
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/1-hacs-repo.png" alt="HACS 에 사용자 지정 저장소 넣기" width="760"></p>
+
+> 사이트의 「HA 연결 › ➕ 기기 연결」에 있는 **🧩 내 Home Assistant 의 HACS 에서 열기** 단추를 누르면 이 단계를 건너뛰고 바로 다음 화면이 열립니다.
+
+### 2. 내려받고 다시 시작
+
+**3ds** 를 열어 **다운로드** → Home Assistant 를 **다시 시작** (설정 › 시스템 › 다시 시작).
+
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/2-download.png" alt="3ds 내려받기" width="760"></p>
+
+### 3. 통합 추가
+
+설정 › 기기 및 서비스 → 오른쪽 아래 **통합 추가** → **3ds** 를 찾아 누릅니다.
+
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/3-add.png" alt="통합 추가에서 3ds 찾기" width="760"></p>
+
+### 4. 사이트 주소 · 연결 코드 붙여 넣기
+
+사이트의 「HA 연결 › ➕ 기기 연결」에서 **사이트 주소** 와 **연결 코드** 를 복사해 붙여 넣고 **확인**.
+연결 코드는 비밀번호와 같습니다 — 남에게 보이지 마세요.
+
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/4-code.png" alt="사이트 주소와 연결 코드 붙여 넣기" width="760"></p>
+
+### 5. 온습도 센서 고르기 (한꺼번에)
+
+맨 위 **✨ 온습도 센서 여러 개를 한꺼번에** 를 고르고, 보관함(드라이박스 · AMS …)의 **습도 센서** 들을 체크 → **확인**.
+
+- 같은 기기의 **온도 센서는 알아서 같이** 붙습니다.
+- 센서마다 사이트에 보관함이 하나씩 만들어지고, 1~2분 뒤 사이트의 HA 연결 화면에 🟢 로 나타납니다.
+- 나중에 이 통합의 **구성** 에서 센서를 더 고르거나 뺄 수 있습니다.
+
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/5-bulk.png" alt="한꺼번에 — 습도 센서 체크" width="760"></p>
+
+### 6. 프린터 · 장비 붙이기 (하나씩)
+
+통합을 **한 번 더 추가** 하고(주소 · 코드는 채워져 있습니다) **내 프린터 — 하나씩** 또는 **업체 장비 — 하나씩** 을 고릅니다.
+Home Assistant 의 **기기를 하나 고르면** 상태 · 진행률 · 남은 시간 · 내부 온도 · 카메라 센서를 찾아 채워 줍니다. 확인하고 **확인**.
+
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/6-printer.png" alt="프린터 · 장비 — 기기를 고르면 센서가 채워짐" width="760"></p>
+
+### 7. 사이트에서 마무리
+
+- **필라멘트에 붙이기**: 정비 수첩에서 필라멘트의 **보관 위치** 를 목록에서 고르면, 그 보관함의 습도 · 온도가 필라멘트에 같이 보입니다.
+- **알림 기준 · 이름 · 붙일 곳**: 사이트의 HA 연결 화면에서 기기 카드의 ✏️.
+- **카메라 사진 공개 여부**: 같은 ✏️ 에서 정합니다 (기본은 나만 봄).
+
+## 설치 요약 (HACS)
 
 1. HACS › 오른쪽 위 ⋮ › **사용자 지정 저장소** › `https://github.com/keidischoi/ha-3ds-link` · 종류 **통합** › 추가
 2. **3ds** 를 내려받고 Home Assistant 를 다시 시작
