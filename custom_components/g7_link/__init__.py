@@ -34,6 +34,7 @@ from .const import (
     CONF_CAMERA,
     CONF_CODE,
     CONF_DEVICE_ID,
+    CONF_DEVICES,
     CONF_HUM,
     CONF_INTERVAL,
     CONF_PUSH_URL,
@@ -57,11 +58,19 @@ _NET_ERRORS = (aiohttp.ClientError, TimeoutError, OSError)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """통합 하나(= 기기 하나)를 시작."""
-    pusher = Pusher(hass, entry)
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = pusher
-    pusher.start()
-    entry.async_on_unload(pusher.stop)
+    """통합 하나를 시작 — 기기 하나짜리, 또는 한꺼번에 연결한 기기 여러 대."""
+    conf: dict[str, Any] = {**entry.data, **entry.options}
+    devices = conf.get(CONF_DEVICES)
+    if isinstance(devices, list) and devices:
+        shared = {k: v for k, v in conf.items() if k != CONF_DEVICES}
+        confs = [{**shared, **d} for d in devices if isinstance(d, dict)]
+    else:
+        confs = [conf]
+    pushers = [Pusher(hass, str(c.get("name") or entry.title), c, first=20 + i * 3) for i, c in enumerate(confs)]
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = pushers
+    for pusher in pushers:
+        pusher.start()
+        entry.async_on_unload(pusher.stop)
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
 
@@ -78,12 +87,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """통합을 지우면 사이트의 기기도 지움 (안 되면 사이트 화면에서 지우면 됨)."""
     data = entry.data
-    url = f"{data.get(CONF_SITE, '')}{HUB_PATH}{data.get(CONF_CODE, '')}/devices/{data.get(CONF_DEVICE_ID, 0)}"
-    try:
-        resp = await async_get_clientsession(hass).delete(url, timeout=_TIMEOUT)
-        resp.release()
-    except _NET_ERRORS as err:
-        _LOGGER.debug("3ds: 사이트의 기기를 지우지 못함: %s", err)
+    devices = data.get(CONF_DEVICES)
+    ids = [d.get(CONF_DEVICE_ID) for d in devices if isinstance(d, dict)] if isinstance(devices, list) and devices else [data.get(CONF_DEVICE_ID, 0)]
+    for device_id in ids:
+        url = f"{data.get(CONF_SITE, '')}{HUB_PATH}{data.get(CONF_CODE, '')}/devices/{device_id or 0}"
+        try:
+            resp = await async_get_clientsession(hass).delete(url, timeout=_TIMEOUT)
+            resp.release()
+        except _NET_ERRORS as err:
+            _LOGGER.debug("3ds: 사이트의 기기를 지우지 못함: %s", err)
 
 
 def _int(value: Any, default: int) -> int:
@@ -103,10 +115,11 @@ def _float(value: Any) -> float | None:
 class Pusher:
     """값을 모아 사이트로 보냄."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+    def __init__(self, hass: HomeAssistant, title: str, conf: dict[str, Any], first: int = 20) -> None:
         self.hass = hass
-        self.conf: dict[str, Any] = {**entry.data, **entry.options}
-        self.title = entry.title
+        self.conf: dict[str, Any] = conf
+        self.title = title
+        self._first = first  # 켠 뒤 처음 보낼 때까지 (초) — 기기가 여러 대면 조금씩 엇갈리게
         self.push_url: str = self.conf.get(CONF_PUSH_URL, "") or ""
         # 사이트가 정한 것 (만들 때 받아 둔 값으로 시작 → 켠 뒤 · 값을 보낼 때마다 사이트의 답으로 고침)
         self.mode: str = str(self.conf.get("send_mode") or "interval")
@@ -142,7 +155,7 @@ class Pusher:
             # 사진은 값과 따로 — 1분마다 「보낼 때가 됐나」만 보고, 실제로는 정한 간격에 한 장
             self._unsubs.append(async_track_time_interval(self.hass, self._snap_tick, timedelta(minutes=1)))
         # 켜고 조금 뒤 한 번 — 사이트 화면이 바로 🟢 로 바뀌게
-        self._unsubs.append(async_call_later(self.hass, 20, self._tick))
+        self._unsubs.append(async_call_later(self.hass, self._first, self._tick))
 
     @callback
     def stop(self) -> None:

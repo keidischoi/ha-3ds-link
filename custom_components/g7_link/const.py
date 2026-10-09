@@ -25,6 +25,9 @@ CONF_CAMERA = "camera"
 CONF_HUMIDITY_MAX = "humidity_max"
 CONF_TEMP_MAX = "temp_max"
 CONF_SNAP_PUBLIC = "snap_public"
+CONF_DEVICES = "devices"  # 한꺼번에 연결한 통합: 기기 여러 대 [{device_id, token, push_url, name, ent_hum, ent_temp}]
+CONF_BULK = "bulk"
+CONF_SENSORS = "sensors"
 CONF_INTERVAL = "interval"  # 회원이 고른 보내는 주기 (분) — 사이트가 정한 주기보다 짧을 수 없음
 
 ENTITY_KEYS = (CONF_HUM, CONF_TEMP, CONF_STATE, CONF_PROGRESS, CONF_REMAINING, CONF_JOB)

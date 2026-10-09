@@ -11,7 +11,7 @@
       },
       "target": {
         "title": "What is it attached to?",
-        "description": "One entry is one device. Add the integration again for more.",
+        "description": "With several temperature / humidity sensors, the first option is easiest. Printers and equipment are added one by one.",
         "data": {
           "target": "Attach to"
         }
@@ -42,6 +42,14 @@
           "snap_public": "Show the picture to other members of the site",
           "interval": "Regular send interval (min) — empty = site default, cannot be shorter"
         }
+      },
+      "bulk": {
+        "title": "Connect many sensors at once",
+        "description": "Pick several humidity sensors — one storage device is created on the site for each. The temperature sensor of the same device is attached automatically and the device / area name is used (you can rename it on the site). Use Configure later to add or remove sensors. {message}",
+        "data": {
+          "sensors": "Humidity sensors (pick several)",
+          "humidity_max": "Alert when humidity is above (%) — only for newly created ones"
+        }
       }
     },
     "error": {
@@ -51,7 +59,7 @@
       "rejected": "The site refused it (see the description above)."
     },
     "abort": {
-      "already_configured": "This device is already added."
+      "already_configured": "Already added — use Configure on that entry to pick more sensors."
     }
   },
   "options": {
@@ -72,6 +80,14 @@
           "camera": "Camera (one small picture while running)",
           "snap_public": "Show the picture to other members of the site",
           "interval": "Regular send interval (min) — empty = site default, cannot be shorter"
+        }
+      },
+      "bulk": {
+        "title": "Connect many sensors at once",
+        "description": "Pick several humidity sensors — one storage device is created on the site for each. The temperature sensor of the same device is attached automatically and the device / area name is used (you can rename it on the site). Use Configure later to add or remove sensors. {message}",
+        "data": {
+          "sensors": "Humidity sensors (pick several)",
+          "humidity_max": "Alert when humidity is above (%) — only for newly created ones"
         }
       }
     },
