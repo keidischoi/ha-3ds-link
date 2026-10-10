@@ -1,4 +1,4 @@
-"""3ds — Home Assistant 의 온습도 · 기기 상태 · 카메라 사진을 G7 사이트(HA 연결 플러그인)로 보냄.
+"""3ds — Home Assistant 의 온습도 · 기기 상태 · 카메라 사진을 G7 사이트(📡 IoT 연결 플러그인 — 예전 HA 연결)로 보냄.
 
 통합 하나 = 사이트의 기기 하나. 사이트가 이 Home Assistant 로 접속하는 일은 없고, 여기서 보내기만 함.
 
@@ -30,6 +30,7 @@ from homeassistant.helpers.event import (
     async_track_time_interval,
 )
 
+from .hub import hub_request
 from .const import (
     CONF_CAMERA,
     CONF_CODE,
@@ -45,7 +46,6 @@ from .const import (
     DEFAULT_SNAP_GAP_MIN,
     DEFAULT_SNAP_MAX,
     DOMAIN,
-    HUB_PATH,
     ON_STATES,
     PAYLOAD_KEYS,
     SKIP_STATES,
@@ -90,9 +90,8 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     devices = data.get(CONF_DEVICES)
     ids = [d.get(CONF_DEVICE_ID) for d in devices if isinstance(d, dict)] if isinstance(devices, list) and devices else [data.get(CONF_DEVICE_ID, 0)]
     for device_id in ids:
-        url = f"{data.get(CONF_SITE, '')}{HUB_PATH}{data.get(CONF_CODE, '')}/devices/{device_id or 0}"
         try:
-            resp = await async_get_clientsession(hass).delete(url, timeout=_TIMEOUT)
+            resp = await hub_request(async_get_clientsession(hass), "DELETE", data.get(CONF_SITE, ""), f"{data.get(CONF_CODE, '')}/devices/{device_id or 0}", timeout=_TIMEOUT)
             resp.release()
         except _NET_ERRORS as err:
             _LOGGER.debug("3ds: 사이트의 기기를 지우지 못함: %s", err)
@@ -211,9 +210,8 @@ class Pusher:
 
     async def _refresh_site(self, _now: Any = None) -> None:
         """켠 뒤 한 번 — 관리자가 바꾼 방식 · 주기를 받아 옴 (안 되면 예전 값 그대로)."""
-        url = f"{self.conf.get(CONF_SITE, '')}{HUB_PATH}{self.conf.get(CONF_CODE, '')}"
         try:
-            resp = await async_get_clientsession(self.hass).get(url, timeout=_TIMEOUT)
+            resp = await hub_request(async_get_clientsession(self.hass), "GET", self.conf.get(CONF_SITE, ""), self.conf.get(CONF_CODE, ""), timeout=_TIMEOUT)
             if resp.status != 200:
                 resp.release()
                 return
