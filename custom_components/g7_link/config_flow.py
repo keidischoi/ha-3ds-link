@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from .hub import hub_request
 from .const import (
     CONF_AUTO,
     CONF_BULK,
@@ -45,7 +46,7 @@ from .const import (
     CONF_TOKEN,
     DOMAIN,
     ENTITY_KEYS,
-    HUB_PATH,
+
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ class Rejected(Exception):
 async def _hub(hass: HomeAssistant, site: str, code: str) -> dict[str, Any]:
     """사이트에서 붙일 수 있는 곳 목록을 받아 옴."""
     try:
-        resp = await async_get_clientsession(hass).get(f"{site}{HUB_PATH}{code}", timeout=_TIMEOUT)
+        resp = await hub_request(async_get_clientsession(hass), "GET", site, code, timeout=_TIMEOUT)
         if resp.status == 404:
             raise InvalidCode
         if resp.status != 200:
@@ -82,10 +83,10 @@ async def _hub(hass: HomeAssistant, site: str, code: str) -> dict[str, Any]:
 
 async def _save(hass: HomeAssistant, site: str, code: str, device_id: int | None, body: dict[str, Any]) -> dict[str, Any]:
     """사이트에 기기를 만들거나 고침."""
-    url = f"{site}{HUB_PATH}{code}/devices" + (f"/{device_id}" if device_id else "")
+    rest = f"{code}/devices" + (f"/{device_id}" if device_id else "")
     session = async_get_clientsession(hass)
     try:
-        resp = await (session.put if device_id else session.post)(url, json=body, timeout=_TIMEOUT)
+        resp = await hub_request(session, "PUT" if device_id else "POST", site, rest, json=body, timeout=_TIMEOUT)
         if resp.status == 404:
             raise InvalidCode
         data = await resp.json(content_type=None)
@@ -99,7 +100,7 @@ async def _save(hass: HomeAssistant, site: str, code: str, device_id: int | None
 async def _delete(hass: HomeAssistant, site: str, code: str, device_id: int) -> None:
     """사이트의 기기를 지움 (안 돼도 넘어감 — 사이트 화면에서 지울 수 있음)."""
     try:
-        resp = await async_get_clientsession(hass).delete(f"{site}{HUB_PATH}{code}/devices/{device_id}", timeout=_TIMEOUT)
+        resp = await hub_request(async_get_clientsession(hass), "DELETE", site, f"{code}/devices/{device_id}", timeout=_TIMEOUT)
         resp.release()
     except (aiohttp.ClientError, TimeoutError):
         pass

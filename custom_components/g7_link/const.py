@@ -46,7 +46,10 @@ PAYLOAD_KEYS = {
     CONF_JOB: "job",
 }
 
-HUB_PATH = "/api/plugins/custom-ha_link/hub/"
+# 0.3.1 사이트 플러그인 이름이 바뀜: HA 연결(custom-ha_link) → IoT 연결(custom-iot_link). 새 주소 먼저, 없으면 예전 주소 (hub.py)
+HUB_PATH = "/api/plugins/custom-iot_link/hub/"
+HUB_PATH_OLD = "/api/plugins/custom-ha_link/hub/"
+HUB_PATHS = (HUB_PATH, HUB_PATH_OLD)
 
 DEFAULT_INTERVAL_MIN = 10
 DEFAULT_SNAP_GAP_MIN = 5
