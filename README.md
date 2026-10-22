@@ -1,123 +1,144 @@
 <img src="custom_components/g7_link/brand/icon.png" alt="3ds" width="96" align="right">
 
-# 3ds — Home Assistant 통합
+# 3ds — Home Assistant integration
 
-Home Assistant 의 온습도 센서 · 프린터/장비 상태 · 카메라 사진을 G7(그누보드7) 사이트의 **📡 IoT 연결** 플러그인(`custom-iot_link`, 예전 이름 HA 연결 `custom-ha_link` 도 됨)으로 보냅니다.
-설정 글(YAML)을 쓰지 않고, 화면에서 센서를 고르기만 하면 됩니다.
+Sends Home Assistant temperature / humidity sensors, printer / device state and camera snapshots to a **G7 (Gnuboard 7)** site running the **📡 IoT Link** plugin.
+No YAML — you just pick sensors in the UI.
 
-- 사이트가 내 Home Assistant 로 접속하지 않습니다. 여기서 사이트로 **보내기만** 합니다.
-- 사이트의 화면을 한동안 안 보면 사이트가 알려 주는 느린 주기로 스스로 늦춥니다 (상태 변화는 그대로 바로 보냄). 다시 화면을 열면 다음 번 보낼 때부터 평소 주기로 돌아옵니다.
-- 보내는 방식은 **사이트 관리자가 정합니다**: 「값이 변하면」(습도 · 온도가 정한 만큼 변했을 때, 1분에 한 번까지 + 변화가 없어도 가끔 한 번) 또는 「주기적으로」. 어느 쪽이든 상태가 바뀌면 조금 뒤 바로 한 번. 통합의 **구성**에서 주기를 더 길게 바꿀 수 있습니다 (사이트 기본보다 짧게는 안 됨). 카메라를 고르면 가동 중일 때만 작은 사진(가로 640) 한 장.
+## ⚠️ Requirements — read this first
 
-## 그림으로 보는 설치 · 연결
+This integration **only works together with a G7 site that has the IoT Link plugin installed**. It has no use on its own: every request goes to that site.
 
-처음이면 5분이면 됩니다. 빨간 테두리와 번호를 순서대로 따라 하세요.
-(그림은 화면을 본떠 그린 것입니다. Home Assistant 화면은 버전에 따라 조금 다를 수 있습니다.)
+| You need | Where |
+| --- | --- |
+| A [G7 (Gnuboard 7)](https://github.com/gnuboard/g7) site, version 7.0.5+ | your own site (or a site that offers IoT Link to its members) |
+| The **IoT Link** plugin (`custom-iot_link`, formerly `custom-ha_link`) installed and activated on that site | **[keidischoi/g7-plugin-custom-iot_link](https://github.com/keidischoi/g7-plugin-custom-iot_link)** — MIT, public |
+| A member account on that site | the **site address** and **link code** are shown on the site's `/iot-link` page |
 
-### 1. HACS 에 저장소 넣기
+**Installing the plugin on your G7 site** (full guide in the [plugin README](https://github.com/keidischoi/g7-plugin-custom-iot_link#install)):
 
-HACS 를 열고 오른쪽 위 **⋮** → **사용자 지정 저장소** → 아래 주소를 붙여 넣고 종류는 **통합** → **추가**.
+1. Download `custom-iot_link-<version>.zip` from the [plugin's latest release](https://github.com/keidischoi/g7-plugin-custom-iot_link/releases/latest).
+2. Unzip it into the site's `plugins/_pending/` folder (→ `plugins/_pending/custom-iot_link/plugin.php`).
+3. Run as the web server user: `php artisan plugin:install custom-iot_link`, `php artisan plugin:activate custom-iot_link`, then `php artisan hooks:clear` and `php artisan cache:clear`.
+4. Log in to the site and open `/iot-link` → **➕ Add device** to get the **site address** and **link code** used below.
+
+If you are a member of a site that already runs IoT Link, you can skip this — just get the address and code from the site.
+
+## How it works
+
+- The site never connects into your Home Assistant. This integration only **pushes** values to the site.
+- When nobody has looked at the site's page for a while, the site tells the integration to slow down and it does so on its own (state changes are still sent right away). Once the page is opened again, the normal interval returns from the next send.
+- **The site admin decides how values are sent**: "on change" (when humidity / temperature changes by a set amount — at most once a minute, plus an occasional send even without change) or "periodically". Either way, a state change triggers one send shortly after. You can make the interval longer (not shorter than the site default) in the integration's **Configure**. If you pick a camera, one small snapshot (640 px wide) is sent only while the device is running.
+
+## Install and connect, step by step
+
+About five minutes the first time. Follow the red boxes and numbers in order.
+(The pictures are drawn mock-ups of the screens; Home Assistant may look slightly different depending on the version.)
+
+### 1. Add the repository to HACS
+
+Open HACS → **⋮** (top right) → **Custom repositories** → paste the address below, type **Integration** → **Add**.
 
 ```
 https://github.com/keidischoi/ha-3ds-link
 ```
 
-<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/1-hacs-repo.png" alt="HACS 에 사용자 지정 저장소 넣기" width="760"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/1-hacs-repo.png" alt="Add a custom repository in HACS" width="760"></p>
 
-> 사이트의 「IoT 연결 › ➕ 기기 연결」에 있는 **🧩 내 Home Assistant 의 HACS 에서 열기** 단추를 누르면 이 단계를 건너뛰고 바로 다음 화면이 열립니다.
+> The **🧩 Open in my Home Assistant's HACS** button under the site's IoT Link › ➕ Add device skips this step and opens the next screen directly.
 
-### 2. 내려받고 다시 시작
+### 2. Download and restart
 
-**3ds** 를 열어 **다운로드** → Home Assistant 를 **다시 시작** (설정 › 시스템 › 다시 시작).
+Open **3ds** → **Download** → **restart** Home Assistant (Settings › System › Restart).
 
-<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/2-download.png" alt="3ds 내려받기" width="760"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/2-download.png" alt="Download 3ds" width="760"></p>
 
-### 3. 통합 추가
+### 3. Add the integration
 
-설정 › 기기 및 서비스 → 오른쪽 아래 **통합 추가** → **3ds** 를 찾아 누릅니다.
+Settings › Devices & services → **Add integration** (bottom right) → search for **3ds**.
 
-<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/3-add.png" alt="통합 추가에서 3ds 찾기" width="760"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/3-add.png" alt="Find 3ds in Add integration" width="760"></p>
 
-### 4. 사이트 주소 · 연결 코드 붙여 넣기
+### 4. Paste the site address and link code
 
-사이트의 「IoT 연결 › ➕ 기기 연결」에서 **사이트 주소** 와 **연결 코드** 를 복사해 붙여 넣고 **확인**.
-연결 코드는 비밀번호와 같습니다 — 남에게 보이지 마세요.
+Copy the **site address** and **link code** from the site's IoT Link › ➕ Add device, paste them and press **Submit**.
+The link code works like a password — keep it private.
 
-<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/4-code.png" alt="사이트 주소와 연결 코드 붙여 넣기" width="760"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/4-code.png" alt="Paste the site address and link code" width="760"></p>
 
-### 5. ⚡ 알아서 찾아 연결
+### 5. ⚡ Find and connect automatically
 
-맨 위 **⚡ 알아서 찾아 연결** 을 고르면, 사이트의 **내 프린터** · 필라멘트 **보관 위치** 와 이름이 맞는 Home Assistant 기기 · 습도 센서가 **체크되어** 나옵니다. 맞으면 **확인** 만 누르면 끝입니다.
+Choose **⚡ Find and connect automatically** at the top: Home Assistant devices and humidity sensors whose names match your **My Printer** entries and filament **storage locations** on the site come up **already checked**. If they look right, just press **Submit**.
 
-- 🖨️ 프린터: 별명 · 기종 이름이 HA 기기 이름에 들어 있으면 찾습니다 — 상태 · 진행률 · 남은 시간 · 카메라가 한 번에 붙습니다.
-- 🧵 보관함: 습도 센서(와 그 기기 · 구역 이름)에 필라멘트의 보관 위치 이름이 들어 있으면 그 위치로 붙습니다. 같은 기기의 **온도 센서는 알아서 같이** 붙습니다.
-- 이름이 안 맞은 습도 센서도 목록에 있습니다 — 체크하면 새 보관함으로 만들어집니다.
-- 1~2분 뒤 사이트의 IoT 연결 화면에 🟢 로 나타납니다. 나중에 이 통합의 **구성** 에서 다시 찾거나, 체크를 빼서 지울 수 있습니다.
+- 🖨️ Printers: found when the nickname or model name is part of the HA device name — state, progress, remaining time and camera are attached in one go.
+- 🧵 Storage boxes: a humidity sensor (or its device / area name) containing a filament storage location's name is attached to that location. The **temperature sensor of the same device is attached automatically**.
+- Humidity sensors whose names don't match are listed too — checking one creates a new storage box.
+- After 1–2 minutes they show up as 🟢 on the site's IoT Link page. Later you can search again or uncheck to remove them in this integration's **Configure**.
 
-(아래 그림은 예전 「한꺼번에」 화면입니다 — 지금은 같은 자리에 프린터도 같이 나옵니다.)
+(The picture below shows the older "all at once" screen — printers now appear in the same place.)
 
-<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/5-bulk.png" alt="한꺼번에 — 습도 센서 체크" width="760"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/5-bulk.png" alt="All at once — check humidity sensors" width="760"></p>
 
-### 6. 못 찾은 프린터 · 장비 붙이기 (하나씩)
+### 6. Attach printers / equipment that weren't found (one by one)
 
-통합을 **한 번 더 추가** 하고(주소 · 코드는 채워져 있습니다) **내 프린터 — 하나씩** 또는 **업체 장비 — 하나씩** 을 고릅니다.
-Home Assistant 의 **기기를 하나 고르면** 상태 · 진행률 · 남은 시간 · 내부 온도 · 카메라 센서를 찾아 채워 줍니다. 확인하고 **확인**.
+**Add the integration once more** (address and code are pre-filled) and choose **My Printer — one at a time** or **Company equipment — one at a time**.
+**Pick a Home Assistant device** and the state, progress, remaining time, chamber temperature and camera sensors are filled in for you. Check them and press **Submit**.
 
-<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/6-printer.png" alt="프린터 · 장비 — 기기를 고르면 센서가 채워짐" width="760"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/6-printer.png" alt="Printer / equipment — pick a device and the sensors are filled in" width="760"></p>
 
-### 7. 사이트에서 마무리
+### 7. Finish on the site
 
-- **필라멘트에 붙이기**: 정비 수첩에서 필라멘트의 **보관 위치** 를 목록에서 고르면, 그 보관함의 습도 · 온도가 필라멘트에 같이 보입니다.
-- **알림 기준 · 이름 · 붙일 곳**: 사이트의 IoT 연결 화면에서 기기 카드의 ✏️.
-- **카메라 사진 공개 여부**: 같은 ✏️ 에서 정합니다 (기본은 나만 봄).
+- **Attach to filament**: in the maintenance log, pick the filament's **storage location** from the list, and that box's humidity / temperature appear on the filament.
+- **Alert thresholds · name · where to attach**: ✏️ on the device card on the site's IoT Link page.
+- **Camera snapshot visibility**: same ✏️ (default: only you).
 
-## 설치 요약 (HACS)
+## Quick summary (HACS)
 
-1. HACS › 오른쪽 위 ⋮ › **사용자 지정 저장소** › `https://github.com/keidischoi/ha-3ds-link` · 종류 **통합** › 추가
-2. **3ds** 를 내려받고 Home Assistant 를 다시 시작
-3. 설정 › 기기 및 서비스 › **통합 추가** › "3ds"
-4. 사이트의 「IoT 연결」 › 「➕ 기기 연결」에 나오는 **사이트 주소** 와 **연결 코드** 를 붙여 넣기
-5. 붙일 곳(필라멘트 보관함 · 내 프린터 · 업체 장비 · 그 밖)과 센서를 고르면 끝
+1. HACS › ⋮ (top right) › **Custom repositories** › `https://github.com/keidischoi/ha-3ds-link` · type **Integration** › Add
+2. Download **3ds** and restart Home Assistant
+3. Settings › Devices & services › **Add integration** › "3ds"
+4. Paste the **site address** and **link code** shown under the site's IoT Link › ➕ Add device
+5. Choose where to attach (filament storage · My Printer · company equipment · other) and the sensors — done
 
-**온습도 센서가 여러 개면 한꺼번에**: 5번에서 맨 위 「✨ 온습도 센서 여러 개를 한꺼번에」를 고르고 습도 센서들을 체크하면, 센서마다 사이트에 보관함이 만들어집니다 (같은 기기의 온도 센서는 알아서 같이). 나중에 그 통합의 **구성**에서 센서를 더 고르거나 뺄 수 있습니다.
+**Many thermo-hygrometers at once**: in step 5 choose "✨ Many temperature/humidity sensors at once" and check the humidity sensors — a storage box is created on the site for each sensor (the same device's temperature sensor is attached automatically). You can add or remove sensors later in the integration's **Configure**.
 
-프린터 · 장비를 더 붙이려면 3번부터 다시 하면 됩니다 (주소 · 코드는 채워져 있습니다).
-센서 · 알림 기준을 바꾸려면 통합의 **구성**을 누르세요. 통합을 지우면 사이트의 기기도 같이 지워집니다.
+To attach more printers / equipment, start again from step 3 (address and code are pre-filled).
+To change sensors or alert thresholds, press **Configure** on the integration. Deleting the integration also deletes its devices on the site.
 
-## 프린터 통합
+## Printer integrations
 
-어느 프린터 통합이든 됩니다 — 이 통합은 그 통합이 만든 **센서를 읽어 보내기만** 합니다.
-프린터 · 장비를 붙일 때 Home Assistant 의 **기기를 하나 고르면** 상태 · 진행률 · 남은 시간 · 작업 이름 · 내부 온도 · 카메라를 이름으로 찾아 채워 줍니다 (다음 화면에서 확인 · 고치기).
+Any printer integration works — this integration only **reads the sensors that integration creates and sends them**.
+When attaching a printer / device, **pick one Home Assistant device** and state, progress, remaining time, job name, chamber temperature and camera are found by name (you can check and fix them on the next screen).
 
-| 통합 | 상태 센서 (예) | 비고 |
+| Integration | State sensor (example) | Notes |
 |---|---|---|
-| Bambu Lab (ha-bambulab) | `…_print_status` | 진행률 · 남은 시간 · 작업 이름 · 카메라 |
-| Creality WebSocket (ha_creality_ws) | `…_print_status` | 상태: idle · processing · printing · paused · stopped · completed · error · self-testing |
-| Anycubic (Local · Cloud) | 상태 · 작업 센서 | 센서 이름은 통합 · 기종마다 다름 — 자동으로 못 찾으면 직접 고르기 |
-| Moonraker (Klipper) | `…_current_print_state` | 진행률 · 파일 이름 |
-| OctoPrint | `…_current_state` | 진행률 |
+| Bambu Lab (ha-bambulab) | `…_print_status` | progress · remaining time · job name · camera |
+| Creality WebSocket (ha_creality_ws) | `…_print_status` | states: idle · processing · printing · paused · stopped · completed · error · self-testing |
+| Anycubic (Local · Cloud) | state / job sensors | sensor names differ by integration and model — pick them yourself if not found |
+| Moonraker (Klipper) | `…_current_print_state` | progress · file name |
+| OctoPrint | `…_current_state` | progress |
 
-자동으로 못 찾은 칸은 목록에서 직접 고르면 됩니다. 사이트가 모르는 상태 글은 「쉬는 중」으로 봅니다 — 그런 글이 있으면 알려 주세요.
+Fields that aren't found automatically can be picked from the list. State text the site doesn't know is treated as "idle" — please report such text.
 
-## 보내는 값
+## Values sent
 
-| 고른 것 | 보내는 이름 |
+| What you pick | Sent as |
 |---|---|
-| 습도 센서 | `humidity` |
-| 온도 센서 | `temperature` |
-| 상태 (프린터 상태 · 스위치 · 플러그) | `state` — 사이트가 가동 시간을 셈 |
-| 진행률 · 남은 시간(분) · 작업 이름 (프린터) | `progress` · `remaining_min` · `job` — 사이트의 「내 프린터」로도 넘어감 |
-| 카메라 | JPEG 한 장 (사이트에는 기기마다 최신 한 장만) |
+| Humidity sensor | `humidity` |
+| Temperature sensor | `temperature` |
+| State (printer state · switch · plug) | `state` — the site counts running time |
+| Progress · remaining time (min) · job name (printer) | `progress` · `remaining_min` · `job` — also passed to the site's "My Printer" |
+| Camera | one JPEG (the site keeps only the latest one per device) |
 
-`unknown` · `unavailable` 인 값은 보내지 않습니다.
+`unknown` / `unavailable` values are not sent.
 
-## Home Assistant 버전
+## Home Assistant version
 
-Home Assistant 2024.4 이상. 버전이 올라가도 덜 흔들리게 오래 유지돼 온 기본 기능(상태 읽기 · 타이머 · 상태 변화 듣기 · 설정 화면)만 씁니다.
-카메라 사진처럼 버전 · 카메라 종류에 따라 달라질 수 있는 것은 따로 감싸 두어, 그 부분이 안 돼도 값 보내기는 계속 됩니다.
+Home Assistant 2024.4 or later. Only long-standing core features are used (reading states, timers, listening to state changes, config flow) so that new versions are less likely to break it.
+Things that can vary by version or camera type, such as camera snapshots, are wrapped separately — if that part fails, values keep being sent.
 
-## 문제가 있을 때
+## Troubleshooting
 
-- 습도 · 온도 칸의 목록에 내 센서가 안 보이면: 그 센서에 종류(device class)가 안 달려 있는 것입니다. 설정 › 기기 및 서비스 › 구성요소에서 그 센서의 「표시 유형」을 습도/온도로 바꾸면 목록에 나옵니다.
-- 사이트에 🟢 로 안 바뀌면: 설정 › 시스템 › 로그에서 `g7_link` 를 찾아보세요 (자세히 보려면 로거 수준을 debug 로).
-- "연결 코드가 맞지 않아요": 사이트에서 코드를 새로 만들었으면, 통합을 지우고 새 코드로 다시 추가해야 고칠 수 있습니다 (이미 붙인 기기의 값 보내기는 계속 됩니다).
+- Your sensor isn't in the humidity / temperature list: the sensor has no device class. In Settings › Devices & services › Entities, change the sensor's "Show as" to humidity / temperature and it appears in the list.
+- The site doesn't turn 🟢: look for `g7_link` in Settings › System › Logs (set the logger level to debug for details).
+- "The link code doesn't match": if you generated a new code on the site, delete the integration and add it again with the new code (devices already attached keep sending).

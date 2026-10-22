@@ -94,7 +94,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
             resp = await hub_request(async_get_clientsession(hass), "DELETE", data.get(CONF_SITE, ""), f"{data.get(CONF_CODE, '')}/devices/{device_id or 0}", timeout=_TIMEOUT)
             resp.release()
         except _NET_ERRORS as err:
-            _LOGGER.debug("3ds: 사이트의 기기를 지우지 못함: %s", err)
+            _LOGGER.debug("3ds: could not remove the device on the site: %s", err)
 
 
 def _int(value: Any, default: int) -> int:
@@ -278,7 +278,7 @@ class Pusher:
         try:
             resp = await async_get_clientsession(self.hass).post(self.push_url, json=payload, timeout=_TIMEOUT)
             if resp.status >= 400:
-                _LOGGER.debug("3ds %s: 사이트가 받지 않음 (%s)", self.title, resp.status)
+                _LOGGER.debug("3ds %s: the site did not accept the values (%s)", self.title, resp.status)
                 resp.release()
                 return
             try:
@@ -288,7 +288,7 @@ class Pusher:
             if isinstance(answer, dict):
                 self._apply_site(answer)
         except _NET_ERRORS as err:
-            _LOGGER.debug("3ds %s: 보내지 못함: %s", self.title, err)
+            _LOGGER.debug("3ds %s: could not send: %s", self.title, err)
 
     # ── 카메라 사진 (없어도 되는 것 — 무엇이 잘못돼도 값 보내기에는 영향 없음) ──
 
@@ -316,7 +316,7 @@ class Pusher:
                 self._last_snap = time.monotonic()
             resp.release()
         except Exception as err:  # noqa: BLE001 — 카메라 종류 · 버전마다 내는 오류가 달라 넓게 잡음
-            _LOGGER.debug("3ds %s: 사진을 보내지 못함: %s", self.title, err)
+            _LOGGER.debug("3ds %s: could not send the camera snapshot: %s", self.title, err)
 
     async def _camera_image(self, camera_entity: str) -> bytes | None:
         # 카메라 통합이 없는 집에서도 켜지게 여기서 불러옴

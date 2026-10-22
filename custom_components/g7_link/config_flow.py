@@ -255,7 +255,7 @@ def _scan(hass: HomeAssistant, hub: dict[str, Any]) -> dict[str, dict[str, Any]]
         loc = next((x for x in locations if _norm(x) in text or (len(_norm(name)) >= 2 and _norm(name) in _norm(x))), None)
         place = loc or name
         out[f"h:{ent}"] = {
-            "label": f"🧵 {loc}  ←  {friendly}" if loc else f"🧵 {friendly} (새 보관함: {name})",
+            "label": f"🧵 {loc}  ←  {friendly}" if loc else f"🧵 {friendly} (new storage box: {name})",
             "matched": loc is not None,
             "name": place,
             "body": {CONF_TARGET: "location", CONF_LOCATION: place, CONF_NAME: place, CONF_HUM: ent, CONF_TEMP: temp, CONF_HUMIDITY_MAX: 40},
@@ -432,8 +432,8 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_TARGET, default=CONF_AUTO): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[selector.SelectOptionDict(value=CONF_AUTO, label="⚡ 알아서 찾아 연결 (추천) — 내 프린터 · 필라멘트 보관함과 이름이 맞는 것")]
-                        + [selector.SelectOptionDict(value=k, label=str(v) + " — 하나씩") for k, v in targets.items()],
+                        options=[selector.SelectOptionDict(value=CONF_AUTO, label="⚡ Find and connect automatically (recommended) — matches My Printer and filament storage by name")]
+                        + [selector.SelectOptionDict(value=k, label=str(v) + " — one at a time") for k, v in targets.items()],
                         mode=selector.SelectSelectorMode.LIST,
                     )
                 )
@@ -484,7 +484,7 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "snap_max": self._hub.get("snap_max"),
                     "snapshot": bool(self._hub.get("snapshot", True)),
                 }
-                return self.async_create_entry(title=f"3ds 기기 {len(devices)}개", data=data, options={})
+                return self.async_create_entry(title=f"3ds — {len(devices)} devices", data=data, options={})
             errors.setdefault("base", "need_entity")
         schema = _items_schema({k: c["label"] for k, c in self._cands.items()}, [k for k, c in self._cands.items() if c["matched"]])
         return self.async_show_form(step_id="auto", data_schema=schema, errors=errors, description_placeholders=placeholders)
@@ -529,7 +529,7 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "gap_sec": self._hub.get("gap_sec"),
                     "snapshot": False,
                 }
-                return self.async_create_entry(title=f"3ds 보관함 센서 {len(devices)}개", data=data, options={})
+                return self.async_create_entry(title=f"3ds — {len(devices)} storage sensors", data=data, options={})
             errors["base"] = last or "need_entity"
         return self.async_show_form(step_id="bulk", data_schema=_bulk_schema(), errors=errors, description_placeholders=placeholders)
 
@@ -678,7 +678,7 @@ class G7LinkOptionsFlow(config_entries.OptionsFlow):
                     if key not in picked:
                         await _delete(self.hass, site, code, int(gone.get(CONF_DEVICE_ID) or 0))
                 data[CONF_DEVICES] = keep
-                self.hass.config_entries.async_update_entry(entry, data=data, title=f"3ds 기기 {len(keep)}개")
+                self.hass.config_entries.async_update_entry(entry, data=data, title=f"3ds — {len(keep)} devices")
                 return self.async_create_entry(title="", data=dict(entry.options))
         options = {k: f"✔ {d.get(CONF_NAME) or k}" for k, d in current.items()}
         options.update({k: c["label"] for k, c in self._cands.items()})
@@ -754,7 +754,7 @@ class G7LinkOptionsFlow(config_entries.OptionsFlow):
                     if gone.get(CONF_HUM) not in picked:
                         await _delete(self.hass, site, code, int(gone.get(CONF_DEVICE_ID) or 0))
                 data[CONF_DEVICES] = keep
-                self.hass.config_entries.async_update_entry(entry, data=data, title=f"3ds 보관함 센서 {len(keep)}개")
+                self.hass.config_entries.async_update_entry(entry, data=data, title=f"3ds — {len(keep)} storage sensors")
                 return self.async_create_entry(title="", data=dict(entry.options))
         current = [d.get(CONF_HUM) for d in devices if d.get(CONF_HUM)]
         return self.async_show_form(step_id="bulk", data_schema=_bulk_schema(current), errors=errors, description_placeholders=placeholders)
