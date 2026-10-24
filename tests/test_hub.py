@@ -100,6 +100,22 @@ async def main() -> None:
         await runner.cleanup()
 
 
+
+async def server_check() -> None:
+    """0.4.0 HA 서버 머리글 — 인스턴스 ID · 위치 이름 (HA 없이 흉내)."""
+    ha = types.ModuleType("homeassistant"); helpers = types.ModuleType("homeassistant.helpers"); inst = types.ModuleType("homeassistant.helpers.instance_id")
+
+    async def _get(_hass):
+        return "0123abcd-4567-89ef-0123-456789abcdef"
+
+    inst.async_get = _get; helpers.instance_id = inst; ha.helpers = helpers
+    sys.modules.update({"homeassistant": ha, "homeassistant.helpers": helpers, "homeassistant.helpers.instance_id": inst})
+    fake = types.SimpleNamespace(config=types.SimpleNamespace(location_name="작업실 HA"))
+    h = await hub.server_headers(fake)
+    check(h.get("X-G7-Server") == "0123abcd456789ef0123456789abcdef" and h.get("X-G7-Server-Name") == "%EC%9E%91%EC%97%85%EC%8B%A4%20HA" and await hub.server_headers(None) == {}, "0.4.0 HA 서버 머리글 (ID · 이름 · hass 없으면 없음)")
+
+
 asyncio.run(main())
+asyncio.run(server_check())
 print(f"\n통과 {passed} · 실패 {failed}")
 sys.exit(1 if failed else 0)

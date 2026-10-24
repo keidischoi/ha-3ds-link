@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 import aiohttp
 
@@ -31,8 +32,31 @@ async def _is_plugin_answer(resp: aiohttp.ClientResponse) -> bool:
     return isinstance(data, dict) and "ok" in data
 
 
-async def hub_request(session: Any, method: str, site: str, rest: str, **kwargs: Any) -> aiohttp.ClientResponse:
-    """허브 요청 — `rest` 는 경로 뒤쪽 (연결 코드 · /devices …). 마지막 응답을 돌려줌 (본문은 다시 읽을 수 있음)."""
+async def server_headers(hass: Any) -> dict[str, str]:
+    """0.4.0 이 HA 서버가 누구인지 — 사이트가 HA 서버마다 기기를 나눠 보여 줌 (탭 · 대기 칸).
+
+    X-G7-Server = HA 인스턴스 ID (서버마다 다르고 바뀌지 않음) · X-G7-Server-Name = HA 위치 이름 (설정 › 시스템 › 일반).
+    못 얻으면 빈 사전 (사이트는 「서버 이름 없음」으로 둠).
+    """
+    if hass is None:
+        return {}
+    try:
+        from homeassistant.helpers import instance_id
+
+        sid = await instance_id.async_get(hass)
+    except Exception:  # noqa: BLE001 — 머리글만 빠지고 나머지는 그대로
+        return {}
+    name = str(getattr(getattr(hass, "config", None), "location_name", "") or "Home Assistant")
+    return {"X-G7-Server": str(sid).replace("-", "")[:64], "X-G7-Server-Name": quote(name[:60], safe="")}
+
+
+async def hub_request(session: Any, method: str, site: str, rest: str, *, hass: Any = None, **kwargs: Any) -> aiohttp.ClientResponse:
+    """허브 요청 — `rest` 는 경로 뒤쪽 (연결 코드 · /devices …). 마지막 응답을 돌려줌 (본문은 다시 읽을 수 있음).
+
+    0.4.0 `hass` 를 주면 이 HA 서버 머리글을 붙임.
+    """
+    if hass is not None:
+        kwargs["headers"] = {**(await server_headers(hass)), **(kwargs.get("headers") or {})}
     paths = _order(site)
     resp: aiohttp.ClientResponse | None = None
     for i, path in enumerate(paths):
