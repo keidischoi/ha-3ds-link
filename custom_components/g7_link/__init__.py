@@ -211,7 +211,9 @@ class Pusher:
     async def _refresh_site(self, _now: Any = None) -> None:
         """켠 뒤 한 번 — 관리자가 바꾼 방식 · 주기를 받아 옴 (안 되면 예전 값 그대로)."""
         try:
-            resp = await hub_request(async_get_clientsession(self.hass), "GET", self.conf.get(CONF_SITE, ""), self.conf.get(CONF_CODE, ""), hass=self.hass, timeout=_TIMEOUT)
+            dev = _int(self.conf.get(CONF_DEVICE_ID), 0)   # 0.4.1 이 기기 번호도 — 값을 아직 안 보낸 기기도 사이트가 HA 서버를 적음
+            rest = self.conf.get(CONF_CODE, "") + (f"?device={dev}" if dev > 0 else "")
+            resp = await hub_request(async_get_clientsession(self.hass), "GET", self.conf.get(CONF_SITE, ""), rest, hass=self.hass, timeout=_TIMEOUT)
             if resp.status != 200:
                 resp.release()
                 return
