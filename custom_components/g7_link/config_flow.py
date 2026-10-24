@@ -184,6 +184,18 @@ def _norm(text: Any) -> str:
     return re.sub(r"[^0-9a-z가-힣]+", "", str(text or "").lower())
 
 
+def _near(a: Any, b: Any) -> bool:
+    """0.3.4 이름이 거의 같은지 — 빈칸 · 기호 · 대소문자 빼고 같거나, 한쪽이 다른 쪽을 품고 짧은 쪽이 긴 쪽의 70% 이상 (3글자 이상).
+    사이트(IoT 연결 1.7.15+)와 같은 규칙 — 「1번」 보관함이 「Awair 1번방」 센서에 붙는 일이 없게."""
+    x, y = _norm(a), _norm(b)
+    if len(x) < 2 or len(y) < 2:
+        return False
+    if x == y:
+        return True
+    short, long_ = (x, y) if len(x) < len(y) else (y, x)
+    return len(short) >= 3 and short in long_ and len(short) / len(long_) >= 0.7
+
+
 def _scan(hass: HomeAssistant, hub: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """⚡ 알아서 찾기 — 사이트의 내 프린터 · 필라멘트 보관 위치와 이름이 맞는 HA 기기 · 습도 센서를 찾음.
 
@@ -251,11 +263,10 @@ def _scan(hass: HomeAssistant, hub: dict[str, Any]) -> dict[str, dict[str, Any]]
             continue  # 프린터 기기에 딸린 습도는 프린터 쪽에서 이미 씀
         name, temp = _describe(hass, ent)
         friendly = str(state.attributes.get("friendly_name") or ent)
-        text = _norm(f"{name} {friendly}")
-        loc = next((x for x in locations if _norm(x) in text or (len(_norm(name)) >= 2 and _norm(name) in _norm(x))), None)
+        loc = next((x for x in locations if _near(x, name) or _near(x, friendly)), None)   # 0.3.4 이름이 거의 같을 때만 — 아니면 사이트의 📡 대기 칸으로
         place = loc or name
         out[f"h:{ent}"] = {
-            "label": f"🧵 {loc}  ←  {friendly}" if loc else f"🧵 {friendly} (new storage box: {name})",
+            "label": f"🧵 {loc}  ←  {friendly}" if loc else f"🧵 {friendly} (→ the site's 📡 waiting area — place it on the board)",
             "matched": loc is not None,
             "name": place,
             "body": {CONF_TARGET: "location", CONF_LOCATION: place, CONF_NAME: place, CONF_HUM: ent, CONF_TEMP: temp, CONF_HUMIDITY_MAX: 40},
