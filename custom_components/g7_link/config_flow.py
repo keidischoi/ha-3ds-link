@@ -68,7 +68,7 @@ class Rejected(Exception):
 async def _hub(hass: HomeAssistant, site: str, code: str) -> dict[str, Any]:
     """사이트에서 붙일 수 있는 곳 목록을 받아 옴."""
     try:
-        resp = await hub_request(async_get_clientsession(hass), "GET", site, code, timeout=_TIMEOUT)
+        resp = await hub_request(async_get_clientsession(hass), "GET", site, code, hass=hass, timeout=_TIMEOUT)
         if resp.status == 404:
             raise InvalidCode
         if resp.status != 200:
@@ -86,7 +86,7 @@ async def _save(hass: HomeAssistant, site: str, code: str, device_id: int | None
     rest = f"{code}/devices" + (f"/{device_id}" if device_id else "")
     session = async_get_clientsession(hass)
     try:
-        resp = await hub_request(session, "PUT" if device_id else "POST", site, rest, json=body, timeout=_TIMEOUT)
+        resp = await hub_request(session, "PUT" if device_id else "POST", site, rest, hass=hass, json=body, timeout=_TIMEOUT)
         if resp.status == 404:
             raise InvalidCode
         data = await resp.json(content_type=None)
@@ -100,7 +100,7 @@ async def _save(hass: HomeAssistant, site: str, code: str, device_id: int | None
 async def _delete(hass: HomeAssistant, site: str, code: str, device_id: int) -> None:
     """사이트의 기기를 지움 (안 돼도 넘어감 — 사이트 화면에서 지울 수 있음)."""
     try:
-        resp = await hub_request(async_get_clientsession(hass), "DELETE", site, f"{code}/devices/{device_id}", timeout=_TIMEOUT)
+        resp = await hub_request(async_get_clientsession(hass), "DELETE", site, f"{code}/devices/{device_id}", hass=hass, timeout=_TIMEOUT)
         resp.release()
     except (aiohttp.ClientError, TimeoutError):
         pass

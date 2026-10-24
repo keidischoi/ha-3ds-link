@@ -30,6 +30,10 @@ If you are a member of a site that already runs IoT Link, you can skip this — 
 - When nobody has looked at the site's page for a while, the site tells the integration to slow down and it does so on its own (state changes are still sent right away). Once the page is opened again, the normal interval returns from the next send.
 - **The site admin decides how values are sent**: "on change" (when humidity / temperature changes by a set amount — at most once a minute, plus an occasional send even without change) or "periodically". Either way, a state change triggers one send shortly after. You can make the interval longer (not shorter than the site default) in the integration's **Configure**. If you pick a camera, one small snapshot (640 px wide) is sent only while the device is running.
 
+## Several Home Assistant servers (0.4.0+)
+
+You can use the same link code on more than one Home Assistant server. From 0.4.0 the integration tells the site which server it is (the Home Assistant instance ID and the location name from *Settings › System › General*), so the site shows each server in its own tab, and splits the 📡 waiting area by server. Each server only sees its own devices when it asks the site for its list. Devices added by an older version are tagged automatically the next time they send values.
+
 ## Install and connect, step by step
 
 About five minutes the first time. Follow the red boxes and numbers in order.

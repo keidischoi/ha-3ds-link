@@ -30,7 +30,7 @@ from homeassistant.helpers.event import (
     async_track_time_interval,
 )
 
-from .hub import hub_request
+from .hub import hub_request, server_headers
 from .const import (
     CONF_CAMERA,
     CONF_CODE,
@@ -91,7 +91,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     ids = [d.get(CONF_DEVICE_ID) for d in devices if isinstance(d, dict)] if isinstance(devices, list) and devices else [data.get(CONF_DEVICE_ID, 0)]
     for device_id in ids:
         try:
-            resp = await hub_request(async_get_clientsession(hass), "DELETE", data.get(CONF_SITE, ""), f"{data.get(CONF_CODE, '')}/devices/{device_id or 0}", timeout=_TIMEOUT)
+            resp = await hub_request(async_get_clientsession(hass), "DELETE", data.get(CONF_SITE, ""), f"{data.get(CONF_CODE, '')}/devices/{device_id or 0}", hass=hass, timeout=_TIMEOUT)
             resp.release()
         except _NET_ERRORS as err:
             _LOGGER.debug("3ds: could not remove the device on the site: %s", err)
@@ -211,7 +211,7 @@ class Pusher:
     async def _refresh_site(self, _now: Any = None) -> None:
         """켠 뒤 한 번 — 관리자가 바꾼 방식 · 주기를 받아 옴 (안 되면 예전 값 그대로)."""
         try:
-            resp = await hub_request(async_get_clientsession(self.hass), "GET", self.conf.get(CONF_SITE, ""), self.conf.get(CONF_CODE, ""), timeout=_TIMEOUT)
+            resp = await hub_request(async_get_clientsession(self.hass), "GET", self.conf.get(CONF_SITE, ""), self.conf.get(CONF_CODE, ""), hass=self.hass, timeout=_TIMEOUT)
             if resp.status != 200:
                 resp.release()
                 return
@@ -276,7 +276,7 @@ class Pusher:
             if val is not None:
                 self._sent[key] = val
         try:
-            resp = await async_get_clientsession(self.hass).post(self.push_url, json=payload, timeout=_TIMEOUT)
+            resp = await async_get_clientsession(self.hass).post(self.push_url, json=payload, headers=await server_headers(self.hass), timeout=_TIMEOUT)   # 0.4.0 예전에 만든 기기도 서버가 적힘
             if resp.status >= 400:
                 _LOGGER.debug("3ds %s: the site did not accept the values (%s)", self.title, resp.status)
                 resp.release()
