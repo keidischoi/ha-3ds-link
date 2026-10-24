@@ -72,7 +72,8 @@ Choose **⚡ Find and connect automatically** at the top: Home Assistant devices
 
 - 🖨️ Printers: found when the nickname or model name is part of the HA device name — state, progress, remaining time and camera are attached in one go.
 - 🧵 Storage boxes: a humidity sensor (or its device / area name) containing a filament storage location's name is attached to that location. The **temperature sensor of the same device is attached automatically**.
-- Humidity sensors whose names don't match are listed too — checking one creates a new storage box.
+- Storage boxes are matched only when the names are (almost) the same — e.g. "Dry Box" ↔ "drybox", but not "Box 1" ↔ "Awair room 1".
+- Humidity sensors whose names don't match are listed too — checking one sends it to the site's **📡 waiting area**; put it in a box on the site's **📦 board** (drag it).
 - After 1–2 minutes they show up as 🟢 on the site's IoT Link page. Later you can search again or uncheck to remove them in this integration's **Configure**.
 
 (The picture below shows the older "all at once" screen — printers now appear in the same place.)
@@ -100,7 +101,7 @@ Choose **⚡ Find and connect automatically** at the top: Home Assistant devices
 4. Paste the **site address** and **link code** shown under the site's IoT Link › ➕ Add device
 5. Choose where to attach (filament storage · My Printer · company equipment · other) and the sensors — done
 
-**Many thermo-hygrometers at once**: in step 5 choose "✨ Many temperature/humidity sensors at once" and check the humidity sensors — a storage box is created on the site for each sensor (the same device's temperature sensor is attached automatically). You can add or remove sensors later in the integration's **Configure**.
+**Many thermo-hygrometers at once**: in step 5 choose "✨ Many temperature/humidity sensors at once" and check the humidity sensors — each one goes into the box whose name (almost) matches, otherwise into the site's 📡 waiting area to be placed on the 📦 board (the same device's temperature sensor is attached automatically). You can add or remove sensors later in the integration's **Configure**.
 
 To attach more printers / equipment, start again from step 3 (address and code are pre-filled).
 To change sensors or alert thresholds, press **Configure** on the integration. Deleting the integration also deletes its devices on the site.
