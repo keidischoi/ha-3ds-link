@@ -18,6 +18,7 @@ import aiohttp
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -93,13 +94,9 @@ class Ctx:
         self.base = uid if scope == "all" else f"{uid}|{scope}"   # unique id start
         self.label = f"{self.host} · {scope_name}" if scope_name else self.host   # the card groups by this
 
-    def device(self, cat: str) -> dict[str, Any]:
-        cat = CAT_KEY.get(cat, cat)
-        en, ko = CATS.get(cat, (cat, cat))
-        name = ko if self.ko else en
-        parent = f"status:{self.uid}" if self.scope == "all" else f"status:{self.base}"   # 0.7.1 categories sit under their personal / company device
-        return {"identifiers": {(DOMAIN, f"status:{self.base}:{cat}")}, "name": f"{self.scope_name} {name}".strip(),
-                "manufacturer": "3DS", "model": "3DSSync", "via_device": (DOMAIN, parent), "configuration_url": self.site}
+    def device(self, cat: str = "") -> dict[str, Any]:
+        """0.8.0 one device per personal / company scope — the device page's own boxes split it (controls · sensors · diagnostic)."""
+        return self.scope_device() or _device(self.site, self.uid)
 
     def scope_device(self) -> dict[str, Any] | None:
         """0.7.1 👤 personal / 🏢 company — groups that scope's category devices (site → scope → category)."""
@@ -145,6 +142,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     else:
         chosen = ["all"]   # old site without scopes → everything as before
     keep: list[str] = []
+    coords: list[tuple[StatusCoordinator, Ctx]] = []
     for scope in chosen:
         coord = probe if scope == "all" else StatusCoordinator(hass, site, code, scope)
         if coord is not probe:
@@ -154,8 +152,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         if (sd := ctx.scope_device()) is not None:
             dr.async_get(hass).async_get_or_create(config_entry_id=entry.entry_id, **sd)
         _setup_scope(hass, entry, coord, ctx, async_add_entities)
+        coords.append((coord, ctx))
     if probe.last_update_success:
         _cleanup(hass, entry, uid, keep)
+        # 0.8.0 the 0.7.x category devices (알림 · 주문, 보관함 …) are gone — their sensors moved to the personal / company device
+        reg = dr.async_get(hass)
+        for dev in dr.async_entries_for_config_entry(reg, entry.entry_id):
+            if any(i[0] == DOMAIN and i[1].startswith(f"status:{uid}") and any(i[1].endswith(":" + c) for c in CATS) for i in dev.identifiers):
+                reg.async_remove_device(dev.id)
+    # 0.8.0 「지금 새로 고침」 buttons (the device page's controls box)
+    from .button import offer
+
+    offer(hass, entry, coords)
 
 
 def _cleanup(hass: HomeAssistant, entry: ConfigEntry, uid: str, keep: list[str]) -> None:
@@ -295,6 +303,8 @@ class ListSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
     def __init__(self, coord: StatusCoordinator, ctx: Ctx, key: str, icon: str, active: Any) -> None:
         super().__init__(coord)
         self._key, self._site, self._active = key, ctx.label, active
+        if key == "devices":
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC   # 0.8.0 connected sensors → the diagnostic box
         self._attr_unique_id = f"{ctx.base}|{key}"
         self._attr_translation_key = key
         self._attr_icon = icon
@@ -329,13 +339,14 @@ class SiteDeviceSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = ["online", "offline", "never"]
     _attr_translation_key = "site_device"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC   # 0.8.0 the diagnostic box on the device page
     _unrecorded_attributes = BIG
 
     def __init__(self, coord: StatusCoordinator, ctx: Ctx, dev_id: int, name: str) -> None:
         super().__init__(coord)
         self._id, self._site = dev_id, ctx.label
         self._attr_unique_id = f"{ctx.base}|dev|{dev_id}"
-        self._attr_name = name
+        self._attr_name = f"📡 {name}"
         self._attr_device_info = ctx.device("devices")
 
     def _dev(self) -> dict[str, Any] | None:

@@ -148,37 +148,37 @@
   "entity": {
     "sensor": {
       "unread": {
-        "name": "안 읽은 알림"
+        "name": "🔔 안 읽은 알림"
       },
       "orders_active": {
-        "name": "진행 중 주문"
+        "name": "🛒 진행 중 주문"
       },
       "bids_waiting": {
-        "name": "내 의뢰에 온 입찰"
+        "name": "🔨 내 의뢰에 온 입찰"
       },
       "my_bids": {
-        "name": "내 입찰 대기"
+        "name": "🔨 내 입찰 대기"
       },
       "jobs_open": {
-        "name": "열린 제작 의뢰"
+        "name": "🔨 열린 제작 의뢰"
       },
       "filament_total": {
-        "name": "필라멘트 롤"
+        "name": "🧵 필라멘트 롤"
       },
       "filament_low": {
-        "name": "조금 남은 필라멘트"
+        "name": "🧵 조금 남은 필라멘트"
       },
       "filament_empty": {
-        "name": "다 쓴 필라멘트"
+        "name": "🧵 다 쓴 필라멘트"
       },
       "box": {
-        "name": "보관함 {name}"
+        "name": "📦 {name}"
       },
       "printers": {
-        "name": "출력 중인 프린터"
+        "name": "🖨️ 출력 중인 프린터"
       },
       "devices": {
-        "name": "통신 중인 센서"
+        "name": "📡 통신 중인 센서"
       },
       "site_device": {
         "name": "센서",
@@ -189,7 +189,12 @@
         }
       },
       "recommended": {
-        "name": "업체에 추천된 의뢰"
+        "name": "🔨 업체에 추천된 의뢰"
+      }
+    },
+    "button": {
+      "refresh": {
+        "name": "🔄 지금 새로 고침"
       }
     }
   }
