@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 import io
+from pathlib import Path
 import logging
 import time
 from typing import Any
@@ -56,6 +57,9 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 _TIMEOUT = aiohttp.ClientTimeout(total=20)
 _NET_ERRORS = (aiohttp.ClientError, TimeoutError, OSError)
+CARD_URL = "/g7_link/3dssync-card.js"   # 0.6.0 cards (card picker: 3DSSync) + sidebar panel
+CARD_FILE = Path(__file__).parent / "frontend" / "3dssync-card.js"
+PANEL_PATH = "3dssync"
 PLATFORMS = [Platform.SENSOR]   # 0.5.0 사이트 → HA 센서 (알림 · 주문 · 의뢰 · 필라멘트 · 보관함)
 
 
@@ -77,7 +81,52 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.async_on_unload(pusher.stop)
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await _async_frontend(hass)
     return True
+
+
+async def _async_frontend(hass: HomeAssistant) -> None:
+    """0.6.0 serve the card file, load it on every dashboard and add 「3DSSync」 to the sidebar — once per Home Assistant.
+
+    Wrapped so a frontend change in a new Home Assistant version never stops the sensors.
+    """
+    store = hass.data.setdefault(DOMAIN, {})
+    if store.get("_panel") or "frontend" not in hass.config.components:
+        return
+    from .const import VERSION
+
+    url = f"{CARD_URL}?v={VERSION}"
+    if store.get("_frontend"):
+        return await _async_panel(hass, url)
+    store["_frontend"] = True
+    try:
+        try:
+            from homeassistant.components.http import StaticPathConfig
+
+            await hass.http.async_register_static_paths([StaticPathConfig(CARD_URL, str(CARD_FILE), False)])
+        except ImportError:   # before 2024.7
+            hass.http.register_static_path(CARD_URL, str(CARD_FILE), False)
+        from homeassistant.components.frontend import add_extra_js_url
+
+        add_extra_js_url(hass, url)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.warning("3DSSync: could not add the dashboard cards: %s", err)
+        return
+    await _async_panel(hass, url)
+
+
+async def _async_panel(hass: HomeAssistant, url: str) -> None:
+    store = hass.data.setdefault(DOMAIN, {})
+    try:
+        from homeassistant.components import panel_custom
+
+        await panel_custom.async_register_panel(
+            hass, frontend_url_path=PANEL_PATH, webcomponent_name="g7-3dssync-panel", sidebar_title="3DSSync",
+            sidebar_icon="mdi:printer-3d", module_url=url, require_admin=False, config={},
+        )
+        store["_panel"] = True
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("3DSSync: could not add the sidebar panel: %s", err)
 
 
 async def _async_reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -90,6 +139,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
     release_owner(hass, entry.entry_id)
+    store = hass.data.get(DOMAIN, {})
+    if store.get("_panel") and not [e for e in hass.config_entries.async_entries(DOMAIN) if e.entry_id != entry.entry_id and e.entry_id in store]:
+        from homeassistant.components import frontend
+
+        frontend.async_remove_panel(hass, PANEL_PATH)   # last entry gone → sidebar entry goes too (cards stay loaded until restart)
+        store.pop("_panel", None)
     return ok
 
 

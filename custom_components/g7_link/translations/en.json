@@ -152,6 +152,12 @@
       },
       "box": {
         "name": "Box {name}"
+      },
+      "printers": {
+        "name": "Printing now"
+      },
+      "devices": {
+        "name": "Sensors online"
       }
     }
   }

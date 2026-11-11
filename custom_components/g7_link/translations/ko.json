@@ -152,6 +152,12 @@
       },
       "box": {
         "name": "보관함 {name}"
+      },
+      "printers": {
+        "name": "출력 중인 프린터"
+      },
+      "devices": {
+        "name": "통신 중인 센서"
       }
     }
   }

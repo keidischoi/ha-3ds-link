@@ -1,6 +1,7 @@
 """G7 연결 — 상수."""
 
 DOMAIN = "g7_link"
+VERSION = "0.6.0"   # same as manifest.json (card file ?v=)
 
 CONF_SITE = "site"
 CONF_CODE = "code"
