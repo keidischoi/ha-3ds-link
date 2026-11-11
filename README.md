@@ -147,7 +147,7 @@ After the restart **3DSSync** appears in the sidebar (printers, filament stock, 
 | `custom:g7-3dssync-stock-card` | every spool drawn in its colour with what is left |
 | `custom:g7-3dssync-sensors-card` | storage boxes (humidity, temperature) and which sensors are talking to the site |
 
-Storage boxes are drawn with their temperature and humidity in big numbers, and the box name picks the picture: a name with *dry* / *건조* / *드라이* draws a filament dryer, *shelf* / *rack* / *선반* / *랙* an open shelf, anything else a clear storage bin. Rolls stay in the stock list (each says which box it is in, or *Not in a box*), and rolls in no box also get their own tile. `spools: in_boxes` (also in the card editor) draws the rolls inside the box pictures instead. `box_look: list` shows the earlier text tiles.
+Storage boxes are drawn with their rolls on the left and the box sensor (humidity, temperature) as numbers on the right, and the box name picks the picture: a name with *dry* / *건조* / *드라이* draws a filament dryer, *shelf* / *rack* / *선반* / *랙* an open shelf, anything else a clear storage bin. Rolls in no box get their own tile. `spools: separate` (also in the card editor) shows only the numbers, big, and keeps every roll in the stock list. `box_look: list` shows the earlier text tiles.
 
 Needs the site's IoT link plugin **1.19.9+** for printers, spools and the sensor list. Two more sensors come with it: *Printing now* and *Sensors online*. From 0.6.1 every sensor connected to the site is also its own entity on the 3DSSync device (state online / offline / never · temperature, humidity, where it is attached in the attributes; IoT link 1.19.10+).
 
