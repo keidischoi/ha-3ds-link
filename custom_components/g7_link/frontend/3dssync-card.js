@@ -7,7 +7,7 @@
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.11";
+  const VER = "0.8.12";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
@@ -52,6 +52,11 @@
     if (/선반|랙|진열|shelf|rack/.test(n)) return "shelf";
     return "bin";
   };
+  // 0.8.12 warning colours on the picture itself: lid / body / back turn orange (50 %+) or red (over the limit)
+  const TONE = { "": { lid: "#5b8def", lid2: "#3f6fd1", tint: "transparent", edge: "rgba(150,165,180,.6)" },
+    warn: { lid: "#f59e0b", lid2: "#d97706", tint: "rgba(245,158,11,.16)", edge: "rgba(245,158,11,.85)" },
+    bad: { lid: "#ef4444", lid2: "#c53030", tint: "rgba(239,68,68,.22)", edge: "rgba(239,68,68,.9)" } };
+  const toneOf = (h, over) => over ? "bad" : h !== null && h >= 50 ? "warn" : "";
   const humCol = (h, over) => h === null ? "#8a929c" : over ? "#ef4444" : h >= 50 ? "#f59e0b" : "#22c55e";
   const pctOf = (p) => Math.max(0, Math.min(100, p.pct ?? 100));
   const shadow = `<ellipse cx="110" cy="127" rx="100" ry="4" fill="rgba(0,0,0,.15)"/>`;
@@ -83,7 +88,7 @@
       <tspan fill="${hc}">💧${h === null ? "--" : Math.round(h)}<tspan font-size="${size * 0.7}">%</tspan></tspan><tspan dx="${size * 0.6}" fill="${tc}">🌡${t === null ? "--" : t.toFixed(1)}<tspan font-size="${size * 0.7}">°C</tspan></tspan></text>`;
   };
 
-  const binSvg = (id, show, slots, count, h, t, hc, big) => {
+  const binSvg = (id, show, slots, count, h, t, hc, big, tn = TONE[""]) => {
     const X0 = 18, X1 = 202, gap = (X1 - X0) / Math.max(slots, 1), w = Math.min(30, gap - 6), top = 60, ht = 56, mid = top + ht / 2;
     let rolls = "";
     for (let i = 0; i < slots; i++) {
@@ -102,12 +107,12 @@
     return `<defs>
       <linearGradient id="${id}c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".25"/><stop offset=".35" stop-color="#fff" stop-opacity=".3"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></linearGradient>
       <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e8f3fb" stop-opacity=".3"/><stop offset=".5" stop-color="#e8f3fb" stop-opacity=".06"/><stop offset="1" stop-color="#e8f3fb" stop-opacity=".22"/></linearGradient></defs>
-      ${shadow}<path d="${body}" fill="rgba(214,228,240,.16)" stroke="rgba(150,165,180,.6)"/>${rolls}<path d="${body}" fill="url(#${id}g)" stroke="rgba(150,165,180,.6)"/>${nums}
-      <rect x="4" y="22" width="212" height="14" rx="5" fill="#5b8def"/><rect x="4" y="32" width="212" height="4" fill="#3f6fd1"/>
-      <rect x="30" y="30" width="20" height="16" rx="3" fill="#3f6fd1"/><rect x="170" y="30" width="20" height="16" rx="3" fill="#3f6fd1"/>${more}`;
+      ${shadow}<path d="${body}" fill="rgba(214,228,240,.16)" stroke="rgba(150,165,180,.6)"/>${rolls}<path d="${body}" fill="url(#${id}g)" stroke="${tn.edge}"/><path d="${body}" fill="${tn.tint}"/>${nums}
+      <rect x="4" y="22" width="212" height="14" rx="5" fill="${tn.lid}"/><rect x="4" y="32" width="212" height="4" fill="${tn.lid2}"/>
+      <rect x="30" y="30" width="20" height="16" rx="3" fill="${tn.lid2}"/><rect x="170" y="30" width="20" height="16" rx="3" fill="${tn.lid2}"/>${more}`;
   };
 
-  const dryerSvg = (id, show, slots, count, h, t, hc, big) => {
+  const dryerSvg = (id, show, slots, count, h, t, hc, big, tn = TONE[""]) => {
     const X0 = 22, X1 = 198, gap = (X1 - X0) / Math.max(slots, 1), cy = 76, r = Math.min(23, gap / 2 - 3);
     let rolls = "";
     for (let i = 0; i < slots; i++) {
@@ -119,13 +124,13 @@
       <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dfe6ee" stop-opacity=".26"/><stop offset="1" stop-color="#9aa6b2" stop-opacity=".14"/></linearGradient>
       <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".4" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
       ${shadow}<path d="M78 16 v-6 a6 6 0 0 1 6 -6 h52 a6 6 0 0 1 6 6 v6" fill="none" stroke="#9aa3ad" stroke-width="5" stroke-linecap="round"/>
-      <rect x="8" y="14" width="204" height="110" rx="16" fill="url(#${id}b)" stroke="rgba(150,165,180,.6)"/>
+      <rect x="8" y="14" width="204" height="110" rx="16" fill="url(#${id}b)" stroke="${tn.edge}"/><rect x="8" y="14" width="204" height="110" rx="16" fill="${tn.tint}"/>
       <rect x="18" y="26" width="184" height="76" rx="10" fill="#1d2229"/>${rolls}<rect x="18" y="26" width="184" height="76" rx="10" fill="url(#${id}g)"/>${nums}
       ${slots && count > slots ? `<text x="196" y="44" font-size="10" font-weight="700" text-anchor="end" fill="#cfd5dc">+${count - slots}</text>` : ""}
       <circle cx="58" cy="113.5" r="2.5" fill="${hc}"/><circle cx="164" cy="113.5" r="3.5" fill="rgba(150,165,180,.7)"/><circle cx="176" cy="113.5" r="3.5" fill="rgba(150,165,180,.7)"/>`;
   };
 
-  const shelfSvg = (id, show, slots, count, h, t, hc, big) => {
+  const shelfSvg = (id, show, slots, count, h, t, hc, big, tn = TONE[""]) => {
     const X0 = 12, X1 = 208, gap = (X1 - X0) / Math.max(slots, 1), r = Math.min(28, gap / 2 - 3), cy = 98 - r;
     let rolls = "";
     for (let i = 0; i < slots; i++) {
@@ -135,7 +140,7 @@
     const nums = !big ? readout(110, 30, h, t, hc, "var(--g7-text)") : readout(110, 64, h, t, hc, "var(--g7-text)", 22);
     return `<defs>${rollGrad(id)}
       <linearGradient id="${id}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9b48a"/><stop offset="1" stop-color="#a97a4e"/></linearGradient></defs>
-      <rect x="4" y="10" width="212" height="88" rx="4" fill="rgba(200,206,214,.16)" stroke="rgba(150,160,170,.35)"/>
+      <rect x="4" y="10" width="212" height="88" rx="4" fill="rgba(200,206,214,.16)" stroke="${tn.edge}"/><rect x="4" y="10" width="212" height="88" rx="4" fill="${tn.tint}"/>
       <rect x="12" y="98" width="8" height="22" fill="#8b9099"/><rect x="200" y="98" width="8" height="22" fill="#8b9099"/>
       <path d="M12 110 L28 98 L20 98 Z M208 110 L192 98 L200 98 Z" fill="#8b9099"/>
       ${rolls}${nums}
@@ -147,7 +152,7 @@
     const id = "g7b" + (++boxN), kind = boxKind(name), max = kind === "bin" ? 5 : 4;
     const show = spools ? spools.slice(0, max) : [], slots = spools ? Math.max(show.length, Math.min(count, max)) : 0;   // 0.8.11 an empty box draws no empty slot
     const draw = kind === "dryer" ? dryerSvg : kind === "shelf" ? shelfSvg : binSvg;
-    return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true" class="${over ? "over" : ""}">${draw(id, show, slots, count, h, t, humCol(h, over), spools === null)}</svg>`;
+    return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true" class="${over ? "over" : ""}">${draw(id, show, slots, count, h, t, humCol(h, over), spools === null, TONE[toneOf(h, over)])}</svg>`;
   };
   // 0.8.5 rolls in no storage box: standing on a bare desk, a dashed outline where a box would be (no humidity — open air)
   const looseSvg = (spools, count) => {
@@ -197,7 +202,7 @@
     .boxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}.bx .art{margin:4px 0 2px}.boxes.list{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.mini{display:flex;flex-wrap:wrap;gap:2px;align-items:center;margin:2px 0 4px}.mini small{font-size:.7rem;color:var(--g7-dim)}.bx.loose{border-style:dashed}
     .bx svg.over .lcd{animation:g7glow 1.6s ease-in-out infinite}@keyframes g7glow{50%{opacity:.55}}
     .inbox{font-size:.78rem;color:var(--g7-dim);padding:8px 0 0}
-    .bx{border:1px solid var(--g7-line);border-radius:12px;padding:10px}.bx.over{border-color:var(--g7-bad);background:color-mix(in srgb,var(--g7-bad) 7%,transparent)}
+    .bx{border:1px solid var(--g7-line);border-radius:12px;padding:10px}.bx.over{border-color:var(--g7-bad);background:color-mix(in srgb,var(--g7-bad) 7%,transparent)}.bx.warn{border-color:#f59e0b;background:color-mix(in srgb,#f59e0b 6%,transparent)}
     .bx .t{font-weight:600;font-size:.88rem;color:var(--g7-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .bx .h{display:flex;align-items:center;gap:4px;font-size:1.25rem;font-weight:700;color:var(--g7-text);margin:4px 0 2px}.bx.over .h{color:var(--g7-bad)}
     .bx .s{font-size:.75rem;color:var(--g7-dim)}.bx .s.warn{color:var(--g7-bad);font-weight:600;margin-top:2px}
@@ -337,7 +342,7 @@
       const tiles = boxes.map((s) => {
         const a = s.attributes, h = num(a.humidity), t = num(a.temp);
         const inside = this._sep() ? null : all.filter((p) => p.box && a.name && String(p.box).trim() === String(a.name).trim());
-        return `<div class="bx ${a.over ? "over" : ""}" data-ent="${esc(s.entity_id)}" style="cursor:pointer"><div class="t">📦 ${esc(a.name || s.attributes.friendly_name)}</div>
+        return `<div class="bx ${a.over ? "over" : toneOf(h, false)}" data-ent="${esc(s.entity_id)}" style="cursor:pointer"><div class="t">📦 ${esc(a.name || s.attributes.friendly_name)}</div>
           ${list ? `<div class="h">💧 ${h !== null ? Math.round(h) + "%" : "—"}</div>${this._mini(inside)}<div class="s">${t !== null ? `🌡 ${t.toFixed(1)}°C · ` : ""}`
             : `<div class="art">${boxSvg(a.name, inside, this._val(s), h, t, !!a.over)}</div><div class="s">`}🧵 ${this._val(s)} ${esc(L.rolls)}${a.low ? ` (${esc(L.low)} ${a.low})` : ""}</div>${a.over ? `<div class="s warn">⚠ ${esc(L.over)}</div>` : ""}</div>`;
       }).join("");
