@@ -427,12 +427,17 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if len(_scope_options(self._hub)) > 1:
                     return await self.async_step_scope()
                 return await self.async_step_target()
-        prev = next(iter(self._async_current_entries()), None)
-        seed = user_input or (prev.data if prev else {})
+        # 0.8.1 no fixed address — pick a site you already connected (mini PC · NAS …) or type a new one; the code starts empty (it differs per site)
+        seed = user_input or {}
+        known = sorted({str(e.data.get(CONF_SITE)) for e in self._async_current_entries() if e.data.get(CONF_SITE)})
+        site_field: Any = str
+        if known:
+            site_field = selector.SelectSelector(selector.SelectSelectorConfig(
+                options=[selector.SelectOptionDict(value=k, label=k) for k in known], custom_value=True, mode=selector.SelectSelectorMode.DROPDOWN))
         schema = vol.Schema(
             {
-                vol.Required(CONF_SITE, default=seed.get(CONF_SITE, "")): str,
-                vol.Required(CONF_CODE, default=seed.get(CONF_CODE, "")): str,
+                vol.Required(CONF_SITE, default=seed.get(CONF_SITE, vol.UNDEFINED)): site_field,
+                vol.Required(CONF_CODE, default=seed.get(CONF_CODE, vol.UNDEFINED)): str,
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
