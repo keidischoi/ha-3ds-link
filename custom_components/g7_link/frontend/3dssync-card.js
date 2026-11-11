@@ -7,7 +7,7 @@
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.8";
+  const VER = "0.8.9";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
@@ -105,13 +105,13 @@
     }
     const nums = slots ? `<rect x="${SIDE}" y="32" width="46" height="64" rx="7" fill="#111418"/>${readout(SIDE + 23, 66, 86, h, t, hc, "#e5e7eb")}` : readout(110, 68, 92, h, t, hc, "#e5e7eb", true);
     return `<defs>${rollGrad(id)}
-      <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfe4ea"/></linearGradient>
+      <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dfe6ee" stop-opacity=".26"/><stop offset="1" stop-color="#9aa6b2" stop-opacity=".14"/></linearGradient>
       <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".4" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
       ${shadow}<path d="M78 16 v-6 a6 6 0 0 1 6 -6 h52 a6 6 0 0 1 6 6 v6" fill="none" stroke="#9aa3ad" stroke-width="5" stroke-linecap="round"/>
-      <rect x="8" y="14" width="204" height="110" rx="16" fill="url(#${id}b)" stroke="#c4cbd3"/>
+      <rect x="8" y="14" width="204" height="110" rx="16" fill="url(#${id}b)" stroke="rgba(150,165,180,.6)"/>
       <rect x="18" y="26" width="184" height="76" rx="10" fill="#1d2229"/>${rolls}<rect x="18" y="26" width="184" height="76" rx="10" fill="url(#${id}g)"/>${nums}
       ${slots && count > slots ? `<text x="${X1}" y="97" font-size="10" font-weight="700" text-anchor="end" fill="#cfd5dc">+${count - slots}</text>` : ""}
-      <circle cx="58" cy="113.5" r="2.5" fill="${hc}"/><circle cx="164" cy="113.5" r="3.5" fill="#c4cbd3"/><circle cx="176" cy="113.5" r="3.5" fill="#c4cbd3"/>`;
+      <circle cx="58" cy="113.5" r="2.5" fill="${hc}"/><circle cx="164" cy="113.5" r="3.5" fill="rgba(150,165,180,.7)"/><circle cx="176" cy="113.5" r="3.5" fill="rgba(150,165,180,.7)"/>`;
   };
 
   const shelfSvg = (id, show, slots, count, h, t, hc) => {
@@ -148,7 +148,7 @@
     return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true"><defs>${rollGrad(id)}</defs>
       <rect x="6" y="20" width="208" height="84" rx="10" fill="none" stroke="#b8c0ca" stroke-width="1.5" stroke-dasharray="6 5"/>
       ${rolls}${label}${count > slots && slots ? `<text x="208" y="34" font-size="10" font-weight="700" text-anchor="end" fill="#6b7480">+${count - slots}</text>` : ""}
-      <path d="M0 104 H220 L212 116 H8 Z" fill="#cfd5dc"/><rect x="8" y="116" width="204" height="4" rx="2" fill="#aeb6c0"/>
+      <path d="M0 104 H220 L212 116 H8 Z" fill="rgba(160,172,184,.4)"/><rect x="8" y="116" width="204" height="4" rx="2" fill="rgba(130,142,154,.5)"/>
       <text x="110" y="129" font-size="8.5" text-anchor="middle" fill="#8a929c">💧 --</text></svg>`;
   };
   const printerSvg = (busy) => `<svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true" class="${busy ? "busy" : ""}">
