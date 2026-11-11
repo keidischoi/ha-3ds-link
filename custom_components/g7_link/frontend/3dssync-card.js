@@ -7,7 +7,7 @@
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.14";
+  const VER = "0.8.15";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
@@ -35,10 +35,10 @@
     return `<svg width="${size}" height="${size}" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="${r + 1}" fill="#8b9099"/><circle cx="17" cy="17" r="${r}" fill="#d9dce1"/>` +
       `<circle cx="17" cy="17" r="${fill}" fill="${esc(hex)}" stroke="rgba(0,0,0,.18)" stroke-width=".6"/><circle cx="17" cy="17" r="4.4" fill="#5b616b"/><circle cx="17" cy="17" r="1.8" fill="#e8eaee"/></svg>`;
   };
-  // 0.8.4 storage box pictures — the box name picks the look:
-  //   건조 · dry · 드라이 (dryer)  → a filament dryer: white body, handle, dark window with the rolls face-on, screen strip
-  //   선반 · 랙 · shelf · rack · 진열   → an open wall shelf: rolls standing face-on on a plank, a digital tag on the edge
-  //   anything else                    → a clear storage bin: rolls side-on, blue lid with clips, analogue hygrometer dial
+  // storage box pictures — the type comes from the site (kind: dryer · shelf · bin):
+  //   dryer → a filament dryer: body, handle, dark window with the rolls face-on, screen strip
+  //   shelf → an open wall shelf: rolls standing face-on on a plank
+  //   bin   → a clear storage bin: rolls side-on, lid with clips
   // rolls: real colour, how full = what is left · humidity colour green < 50 · orange ≥ 50 · red (blinks) over the limit · grey no sensor
   let boxN = 0;
   const shade = (hex, k) => {   // lighten (k>0) / darken (k<0) a #rrggbb
@@ -46,13 +46,8 @@
     const n = parseInt(m[1], 16), c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(k > 0 ? v + (255 - v) * k : v * (1 + k)));
     return "#" + c.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
   };
-  const boxKind = (name, picked) => {
-    if (picked === "bin" || picked === "dryer" || picked === "shelf") return picked;   // 0.8.14 the type picked on the site (IoT link 1.19.14+) first
-    const n = String(name || "").toLowerCase();
-    if (/건조|드라이|dry/.test(n)) return "dryer";
-    if (/선반|랙|진열|shelf|rack/.test(n)) return "shelf";
-    return "bin";
-  };
+  // 0.8.15 the site decides the box type (picked in stock management, else by name — IoT link 1.19.15+); the card only draws it
+  const boxKind = (kind) => (kind === "dryer" || kind === "shelf" ? kind : "bin");
   // 0.8.12 warning colours on the picture itself: lid / body / back turn orange (50 %+) or red (over the limit)
   const TONE = { "": { lid: "#5b8def", lid2: "#3f6fd1", tint: "transparent", edge: "rgba(150,165,180,.6)" },
     warn: { lid: "#f59e0b", lid2: "#d97706", tint: "rgba(245,158,11,.16)", edge: "rgba(245,158,11,.85)" },
@@ -152,7 +147,7 @@
   };
 
   const boxSvg = (name, spools, count, h, t, over, color, picked) => {
-    const id = "g7b" + (++boxN), kind = boxKind(name, picked), max = kind === "bin" ? 5 : 4;
+    const id = "g7b" + (++boxN), kind = boxKind(picked), max = kind === "bin" ? 5 : 4;
     const show = spools ? spools.slice(0, max) : [], slots = spools ? Math.max(show.length, Math.min(count, max)) : 0;   // 0.8.11 an empty box draws no empty slot
     const draw = kind === "dryer" ? dryerSvg : kind === "shelf" ? shelfSvg : binSvg;
     return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true" class="${over ? "over" : ""}">${draw(id, show, slots, count, h, t, humCol(h, over), spools === null, toneOf(h, over) ? TONE[toneOf(h, over)] : siteTone(color))}</svg>`;

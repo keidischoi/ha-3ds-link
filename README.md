@@ -155,13 +155,13 @@ Card options (all can be set in the card editor too):
 | `spools` | `separate` — box pictures show only the numbers, big; every roll stays in the stock list | rolls drawn inside the boxes |
 | `hide_where` | `true` — hide the 📍 server · scope line | shown when you have more than one |
 
-**Storage box pictures.** The box sensor's humidity and temperature are on one line at the top (green under 50 %, orange from 50 %, red and blinking over the box's limit, 📡 *No sensor* when none is attached) — otherwise the box keeps **its colour from the site** (bin lid, dryer and shelf edges, the dot before its name; IoT link 1.19.13+), and the picture turns orange from 50 % and red over the limit, and the rolls stand below in their real colours, filled by what is left. 🧪 Resin is drawn as a bottle (amber body, its colour filled by what is left) and counted on its own: the stock card shows *N rolls · 🧪 resin M bottles*, and the kg total is filament only. The picture is the box type picked on the site (stock management → 🎨 box lid → 🗂 type: storage bin · filament dryer · shelf; IoT link 1.19.14+); a box with no type picked goes by its name:
+**Storage box pictures.** The box sensor's humidity and temperature are on one line at the top (green under 50 %, orange from 50 %, red and blinking over the box's limit, 📡 *No sensor* when none is attached) — otherwise the box keeps **its colour from the site** (bin lid, dryer and shelf edges, the dot before its name; IoT link 1.19.13+), and the picture turns orange from 50 % and red over the limit, and the rolls stand below in their real colours, filled by what is left. 🧪 Resin is drawn as a bottle (amber body, its colour filled by what is left) and counted on its own: the stock card shows *N rolls · 🧪 resin M bottles*, and the kg total is filament only. The site decides the picture (IoT link 1.19.15+): the box type picked in stock management (🎨 box lid → 🗂 type), or for a box with no type the site's own name rule — the card draws what it is told:
 
-| Box name contains | Picture | Rolls drawn |
+| Box type on the site | Picture | Rolls drawn |
 |---|---|---|
-| *dry* · *건조* · *드라이* | filament dryer | 4 |
-| *shelf* · *rack* · *선반* · *랙* · *진열* | open shelf | 4 |
-| anything else | clear storage bin | 5 |
+| filament dryer | filament dryer | 4 |
+| shelf | open shelf | 4 |
+| storage bin | clear storage bin | 5 |
 
 More rolls than that show as **+N**; the line under the picture always has the full count. Rolls that are in no box get their own **🧵 Not in a box** tile, and with the default `spools` setting the stock list in the same card lists only those. All pictures are translucent, so they fit light and dark themes.
 
