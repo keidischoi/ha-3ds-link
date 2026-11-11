@@ -7,7 +7,7 @@
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.9";
+  const VER = "0.8.10";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
@@ -63,30 +63,29 @@
   };
   const rollGrad = (id) => `<radialGradient id="${id}r" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#000" stop-opacity=".2"/></radialGradient>`;
 
-  // 0.8.7 rolls on the left, the box's sensor (humidity · temperature, as numbers) on the right; no rolls drawn (spools: separate) → the numbers big in the middle
+  // 0.8.10 the box's sensor on one line at the top (💧 humidity · 🌡 temperature, side by side), rolls across the full width below;
+  // no rolls drawn (spools: separate) → the same line, bigger, in the middle
   let NOSENSOR = "no sensor";
-  const readout = (cx, y1, y2, h, t, hc, tc, big) => {
-    const a = big ? 30 : 22, b = big ? 16 : 12;
-    if (h === null && t === null) return `<text x="${cx}" y="${(y1 + y2) / 2}" font-size="${big ? 14 : 10}" font-weight="700" text-anchor="middle" fill="#8a929c">📡 ${esc(NOSENSOR)}</text>`;
-    return `<g class="lcd"><text x="${cx}" y="${y1}" font-size="${a}" font-weight="800" text-anchor="middle" fill="${hc}">💧${h === null ? "--" : Math.round(h)}<tspan font-size="${a * 0.55}">%</tspan></text></g>
-      <text x="${cx}" y="${y2}" font-size="${b}" font-weight="700" text-anchor="middle" fill="${tc}">🌡${t === null ? "--" : t.toFixed(1)}<tspan font-size="${b * 0.7}">°C</tspan></text>`;
+  const readout = (cx, y, h, t, hc, tc, size = 14) => {
+    if (h === null && t === null) return `<text x="${cx}" y="${y}" font-size="${size * 0.85}" font-weight="700" text-anchor="middle" fill="#8a929c">📡 ${esc(NOSENSOR)}</text>`;
+    return `<text class="lcd" x="${cx}" y="${y}" font-size="${size}" font-weight="800" text-anchor="middle">
+      <tspan fill="${hc}">💧${h === null ? "--" : Math.round(h)}<tspan font-size="${size * 0.7}">%</tspan></tspan><tspan dx="${size * 0.6}" fill="${tc}">🌡${t === null ? "--" : t.toFixed(1)}<tspan font-size="${size * 0.7}">°C</tspan></tspan></text>`;
   };
-  const SIDE = 150;   // rolls end here; the sensor numbers sit right of it
 
   const binSvg = (id, show, slots, count, h, t, hc) => {
-    const X0 = 18, X1 = SIDE - 6, gap = (X1 - X0) / Math.max(slots, 1), w = Math.min(28, gap - 5);
+    const X0 = 18, X1 = 202, gap = (X1 - X0) / Math.max(slots, 1), w = Math.min(30, gap - 6), top = 60, ht = 56, mid = top + ht / 2;
     let rolls = "";
     for (let i = 0; i < slots; i++) {
       const p = show[i], x = X0 + gap * i + (gap - w) / 2;
-      if (!p) { rolls += `<rect x="${x}" y="44" width="${w}" height="70" rx="4" fill="none" stroke="#b8c0ca" stroke-dasharray="3 3"/>`; continue; }
-      const col = esc(colorOf(p)), fh = 28 + 32 * pctOf(p) / 100, fy = 79 - fh / 2;
+      if (!p) { rolls += `<rect x="${x}" y="${top}" width="${w}" height="${ht}" rx="4" fill="none" stroke="#b8c0ca" stroke-dasharray="3 3"/>`; continue; }
+      const col = esc(colorOf(p)), fh = 22 + 26 * pctOf(p) / 100, fy = mid - fh / 2;
       let lines = "";
-      for (let k = 1; k < 7; k++) lines += `<line x1="${x + 3}" x2="${x + w - 3}" y1="${fy + k * fh / 7}" y2="${fy + k * fh / 7}" stroke="${esc(shade(colorOf(p), -0.25))}" stroke-width=".7"/>`;
+      for (let k = 1; k < 6; k++) lines += `<line x1="${x + 3}" x2="${x + w - 3}" y1="${fy + k * fh / 6}" y2="${fy + k * fh / 6}" stroke="${esc(shade(colorOf(p), -0.25))}" stroke-width=".7"/>`;
       rolls += `<rect x="${x + 3}" y="${fy}" width="${w - 6}" height="${fh}" fill="${col}"/>${lines}<rect x="${x + 3}" y="${fy}" width="${w - 6}" height="${fh}" fill="url(#${id}c)"/>
-        <rect x="${x}" y="44" width="4" height="70" rx="2" fill="#3a4049"/><rect x="${x + w - 4}" y="44" width="4" height="70" rx="2" fill="#3a4049"/>`;
+        <rect x="${x}" y="${top}" width="4" height="${ht}" rx="2" fill="#3a4049"/><rect x="${x + w - 4}" y="${top}" width="4" height="${ht}" rx="2" fill="#3a4049"/>`;
     }
-    const more = slots && count > slots ? `<text x="${X1}" y="121" font-size="10" font-weight="700" text-anchor="end" fill="#6b7480">+${count - slots}</text>` : "";
-    const nums = slots ? `<line x1="${SIDE}" y1="44" x2="${SIDE}" y2="116" stroke="#c9d2da" stroke-dasharray="2 3"/>${readout(178, 80, 102, h, t, hc, "var(--g7-text)")}` : readout(110, 86, 112, h, t, hc, "var(--g7-text)", true);
+    const more = slots && count > slots ? `<text x="200" y="121" font-size="10" font-weight="700" text-anchor="end" fill="var(--g7-dim)">+${count - slots}</text>` : "";
+    const nums = slots ? readout(110, 53, h, t, hc, "var(--g7-text)") : readout(110, 86, h, t, hc, "var(--g7-text)", 22);
     const body = "M10 34 L210 34 L204 120 Q203 124 199 124 L21 124 Q17 124 16 120 Z";
     return `<defs>
       <linearGradient id="${id}c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".25"/><stop offset=".35" stop-color="#fff" stop-opacity=".3"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></linearGradient>
@@ -97,43 +96,43 @@
   };
 
   const dryerSvg = (id, show, slots, count, h, t, hc) => {
-    const X0 = 22, X1 = SIDE - 4, gap = (X1 - X0) / Math.max(slots, 1), cy = 64, r = Math.min(24, gap / 2 - 3);
+    const X0 = 22, X1 = 198, gap = (X1 - X0) / Math.max(slots, 1), cy = 76, r = Math.min(23, gap / 2 - 3);
     let rolls = "";
     for (let i = 0; i < slots; i++) {
       const p = show[i], cx = X0 + gap * i + gap / 2;
       rolls += p ? faceRoll(id, p, cx, cy, r, "#2b3038") : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#6b7480" stroke-dasharray="3 3"/>`;
     }
-    const nums = slots ? `<rect x="${SIDE}" y="32" width="46" height="64" rx="7" fill="#111418"/>${readout(SIDE + 23, 66, 86, h, t, hc, "#e5e7eb")}` : readout(110, 68, 92, h, t, hc, "#e5e7eb", true);
+    const nums = slots ? readout(110, 44, h, t, hc, "#e5e7eb") : readout(110, 72, h, t, hc, "#e5e7eb", 22);
     return `<defs>${rollGrad(id)}
       <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dfe6ee" stop-opacity=".26"/><stop offset="1" stop-color="#9aa6b2" stop-opacity=".14"/></linearGradient>
       <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".4" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
       ${shadow}<path d="M78 16 v-6 a6 6 0 0 1 6 -6 h52 a6 6 0 0 1 6 6 v6" fill="none" stroke="#9aa3ad" stroke-width="5" stroke-linecap="round"/>
       <rect x="8" y="14" width="204" height="110" rx="16" fill="url(#${id}b)" stroke="rgba(150,165,180,.6)"/>
       <rect x="18" y="26" width="184" height="76" rx="10" fill="#1d2229"/>${rolls}<rect x="18" y="26" width="184" height="76" rx="10" fill="url(#${id}g)"/>${nums}
-      ${slots && count > slots ? `<text x="${X1}" y="97" font-size="10" font-weight="700" text-anchor="end" fill="#cfd5dc">+${count - slots}</text>` : ""}
+      ${slots && count > slots ? `<text x="196" y="44" font-size="10" font-weight="700" text-anchor="end" fill="#cfd5dc">+${count - slots}</text>` : ""}
       <circle cx="58" cy="113.5" r="2.5" fill="${hc}"/><circle cx="164" cy="113.5" r="3.5" fill="rgba(150,165,180,.7)"/><circle cx="176" cy="113.5" r="3.5" fill="rgba(150,165,180,.7)"/>`;
   };
 
   const shelfSvg = (id, show, slots, count, h, t, hc) => {
-    const X0 = 12, X1 = SIDE - 2, gap = (X1 - X0) / Math.max(slots, 1), r = Math.min(30, gap / 2 - 3), cy = 98 - r;
+    const X0 = 12, X1 = 208, gap = (X1 - X0) / Math.max(slots, 1), r = Math.min(28, gap / 2 - 3), cy = 98 - r;
     let rolls = "";
     for (let i = 0; i < slots; i++) {
       const p = show[i], cx = X0 + gap * i + gap / 2;
       rolls += p ? faceRoll(id, p, cx, cy, r, "#3a4049") : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#b8c0ca" stroke-dasharray="3 3"/>`;
     }
-    const nums = slots ? readout(182, 64, 86, h, t, hc, "var(--g7-text)") : readout(110, 56, 84, h, t, hc, "var(--g7-text)", true);
+    const nums = slots ? readout(110, 30, h, t, hc, "var(--g7-text)") : readout(110, 64, h, t, hc, "var(--g7-text)", 22);
     return `<defs>${rollGrad(id)}
       <linearGradient id="${id}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9b48a"/><stop offset="1" stop-color="#a97a4e"/></linearGradient></defs>
       <rect x="4" y="10" width="212" height="88" rx="4" fill="rgba(200,206,214,.16)" stroke="rgba(150,160,170,.35)"/>
       <rect x="12" y="98" width="8" height="22" fill="#8b9099"/><rect x="200" y="98" width="8" height="22" fill="#8b9099"/>
       <path d="M12 110 L28 98 L20 98 Z M208 110 L192 98 L200 98 Z" fill="#8b9099"/>
       ${rolls}${nums}
-      ${slots && count > slots ? `<text x="${X1}" y="24" font-size="10" font-weight="700" text-anchor="end" fill="#6b7480">+${count - slots}</text>` : ""}
+      ${slots && count > slots ? `<text x="208" y="30" font-size="10" font-weight="700" text-anchor="end" fill="var(--g7-dim)">+${count - slots}</text>` : ""}
       <rect x="2" y="98" width="216" height="10" rx="2" fill="url(#${id}w)"/><rect x="2" y="106" width="216" height="2" fill="rgba(0,0,0,.18)"/>`;
   };
 
   const boxSvg = (name, spools, count, h, t, over) => {
-    const id = "g7b" + (++boxN), kind = boxKind(name), max = kind === "bin" ? 4 : 3;
+    const id = "g7b" + (++boxN), kind = boxKind(name), max = kind === "bin" ? 5 : 4;
     const show = spools ? spools.slice(0, max) : [], slots = spools ? Math.max(show.length, Math.min(count, max), 1) : 0;
     const draw = kind === "dryer" ? dryerSvg : kind === "shelf" ? shelfSvg : binSvg;
     return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true" class="${over ? "over" : ""}">${draw(id, show, slots, count, h, t, humCol(h, over))}</svg>`;
