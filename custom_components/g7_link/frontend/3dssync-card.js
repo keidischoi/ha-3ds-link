@@ -2,19 +2,20 @@
  * Reads the 3DSSync sensors (attribute "g7" marks them), so it needs no setup: add "3DSSync" from the card picker.
  *   type: custom:g7-3dssync-card          everything
  *   show: [summary, printers, stock, boxes, sensors]   (optional — pick parts)
+ *   spools: separate                     (optional — rolls only in the stock list; default draws them inside the box pictures)
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.2";
+  const VER = "0.8.3";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
       unread: "알림", orders: "주문", bids: "입찰", low: "조금 남음", live: "통신 중", lost: "끊김", never: "안 옴", none: "아직 없어요",
-      over: "습도 높음", nodata: "3DSSync 센서를 찾지 못했어요 — 통합을 먼저 연결하세요.", ago_m: "분 전", ago_h: "시간 전", ago_d: "일 전", now: "방금", min: "분", h: "시간", company: "업체" },
+      over: "습도 높음", nodata: "3DSSync 센서를 찾지 못했어요 — 통합을 먼저 연결하세요.", ago_m: "분 전", ago_h: "시간 전", ago_d: "일 전", now: "방금", min: "분", h: "시간", company: "업체", inbox: "보관함에 든 {n}롤은 아래 보관함 그림에" },
     en: { printers: "Printers", stock: "Filament stock", boxes: "Storage boxes", sensors: "Connected sensors", rolls: "rolls", all: "Show all", less: "Show less",
       idle: "Idle", printing: "Printing", paused: "Paused", done: "Done", failed: "Failed", offline: "Off", left: "left", nozzle: "Nozzle", bed: "Bed",
       unread: "Notices", orders: "Orders", bids: "Bids", low: "Low", live: "Live", lost: "Lost", never: "Never", none: "Nothing yet",
-      over: "Too humid", nodata: "No 3DSSync sensors found — set up the integration first.", ago_m: "min ago", ago_h: "h ago", ago_d: "d ago", now: "just now", min: "min", h: "h", company: "Company" },
+      over: "Too humid", nodata: "No 3DSSync sensors found — set up the integration first.", ago_m: "min ago", ago_h: "h ago", ago_d: "d ago", now: "just now", min: "min", h: "h", company: "Company", inbox: "{n} rolls in storage boxes are drawn in the boxes below" },
   };
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const num = (v) => (typeof v === "number" && isFinite(v) ? v : null);
@@ -33,30 +34,55 @@
     return `<svg width="${size}" height="${size}" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="${r + 1}" fill="#8b9099"/><circle cx="17" cy="17" r="${r}" fill="#d9dce1"/>` +
       `<circle cx="17" cy="17" r="${fill}" fill="${esc(hex)}" stroke="rgba(0,0,0,.18)" stroke-width=".6"/><circle cx="17" cy="17" r="4.4" fill="#5b616b"/><circle cx="17" cy="17" r="1.8" fill="#e8eaee"/></svg>`;
   };
-  // 0.8.2 storage box picture: clear front, spools inside (real colours, fill = what is left), hygrometer with the humidity
-  const boxSvg = (spools, count, h, over) => {
-    const W = 200, show = spools.slice(0, 4), slots = Math.max(show.length, Math.min(count, 4), 1), gap = 148 / slots;
-    const hc = h === null ? "var(--g7-dim)" : over ? "var(--g7-bad)" : h >= 50 ? "#e0902a" : "var(--g7-ok)";
-    const level = h === null ? 0 : Math.max(0, Math.min(100, h));
+  // 0.8.3 storage box picture: a 3D clear dry box — spools inside as cylinders (real colour, fill = what is left), lid with clips,
+  // a digital hygrometer screen on the front (humidity · temperature; glows red when over the limit)
+  let boxN = 0;
+  const shade = (hex, k) => {   // lighten (k>0) / darken (k<0) a #rrggbb
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "")); if (!m) return hex;
+    const n = parseInt(m[1], 16), c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(k > 0 ? v + (255 - v) * k : v * (1 + k)));
+    return "#" + c.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
+  };
+  const boxSvg = (spools, count, h, t, over) => {
+    const id = "g7b" + (++boxN), show = spools ? spools.slice(0, 4) : [], slots = spools === null ? 0 : Math.max(show.length, Math.min(count, 4), 1);
+    const X0 = 14, X1 = 150, gap = (X1 - X0) / Math.max(slots, 1), cy = 72;
+    const hc = h === null ? "#7c8591" : over ? "#ff5a5a" : h >= 50 ? "#ffb347" : "#59e39a";
     let rolls = "";
     for (let i = 0; i < slots; i++) {
-      const p = show[i], cx = 14 + gap * i + gap / 2, r = Math.min(19, gap / 2 - 2);
-      if (!p) { rolls += `<circle cx="${cx}" cy="44" r="${r}" fill="none" stroke="var(--g7-line)" stroke-dasharray="3 3"/>`; continue; }
-      const fill = r * (0.45 + 0.55 * Math.max(0, Math.min(100, p.pct ?? 100)) / 100);
-      rolls += `<g><circle cx="${cx}" cy="44" r="${r}" fill="#9aa0a8"/><circle cx="${cx}" cy="44" r="${r - 1.4}" fill="#d9dce1"/>` +
-        `<circle cx="${cx}" cy="44" r="${fill}" fill="${esc(colorOf(p))}" stroke="rgba(0,0,0,.18)" stroke-width=".6"/><circle cx="${cx}" cy="44" r="${r * 0.3}" fill="#5b616b"/>` +
-        `<circle cx="${cx}" cy="44" r="${r * 0.12}" fill="#eef0f3"/></g>`;
+      const p = show[i], cx = X0 + gap * i + gap / 2, r = Math.min(22, gap / 2 - 3);
+      if (!p) {   // a roll without colour info
+        rolls += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(150,160,175,.55)" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+        continue;
+      }
+      const col = colorOf(p), fill = r * (0.5 + 0.5 * Math.max(0, Math.min(100, p.pct ?? 100)) / 100);
+      rolls += `<g><circle cx="${cx + 4}" cy="${cy - 3}" r="${r}" fill="${esc(shade(col, -0.45))}"/>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${id}f)" stroke="rgba(0,0,0,.25)" stroke-width=".6"/>
+        <circle cx="${cx}" cy="${cy}" r="${fill}" fill="${esc(col)}"/><circle cx="${cx}" cy="${cy}" r="${fill}" fill="url(#${id}w)"/>
+        <circle cx="${cx}" cy="${cy}" r="${r * 0.34}" fill="#3d434c"/><circle cx="${cx}" cy="${cy}" r="${r * 0.2}" fill="#c9ced6"/><circle cx="${cx}" cy="${cy}" r="${r * 0.1}" fill="#2a2f36"/></g>`;
     }
-    const more = count > slots ? `<text x="158" y="72" font-size="9" text-anchor="end" fill="var(--g7-dim)">+${count - slots}</text>` : "";
-    return `<svg viewBox="0 0 ${W} 78" width="100%" height="78" aria-hidden="true">
-      <rect x="4" y="12" width="160" height="62" rx="8" fill="var(--g7-soft)" stroke="var(--g7-line)"/>
-      <rect x="2" y="6" width="164" height="10" rx="4" fill="var(--g7-dim)" opacity=".55"/>
-      ${rolls}${more}
-      <rect x="6" y="18" width="156" height="54" rx="6" fill="rgba(160,200,230,.10)" stroke="rgba(255,255,255,.18)"/>
-      <path d="M12 22 L30 22 L16 40" fill="rgba(255,255,255,.10)"/>
-      <rect x="174" y="12" width="20" height="62" rx="10" fill="var(--g7-soft)" stroke="var(--g7-line)"/>
-      <rect x="180" y="${18 + 50 * (1 - level / 100)}" width="8" height="${50 * level / 100}" rx="4" fill="${hc}"/>
-      <path d="M184 4 C180 9 178 11 178 13.5 a6 6 0 0 0 12 0 C190 11 188 9 184 4z" fill="${hc}"/></svg>`;
+    const more = slots && count > slots ? `<text x="${X1 - 2}" y="104" font-size="10" font-weight="700" text-anchor="end" fill="rgba(120,130,145,.9)">+${count - slots}</text>` : "";
+    const label = slots ? "" : `<text x="91" y="80" font-size="22" font-weight="700" text-anchor="middle" fill="rgba(120,130,145,.55)">${count}</text>`;
+    const hv = h === null ? "--" : Math.round(h), tv = t === null ? "" : t.toFixed(1) + "°";
+    return `<svg viewBox="0 0 230 124" width="100%" aria-hidden="true" class="${over ? "over" : ""}">
+      <defs>
+        <linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".34"/><stop offset=".55" stop-color="#cfe6f5" stop-opacity=".10"/><stop offset="1" stop-color="#9ec4dd" stop-opacity=".22"/></linearGradient>
+        <linearGradient id="${id}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef3f7"/><stop offset="1" stop-color="#b8c4ce"/></linearGradient>
+        <linearGradient id="${id}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9fb0bd" stop-opacity=".55"/><stop offset="1" stop-color="#6f808d" stop-opacity=".55"/></linearGradient>
+        <radialGradient id="${id}f" cx=".35" cy=".35" r=".8"><stop offset="0" stop-color="#f4f5f7"/><stop offset="1" stop-color="#a9afb8"/></radialGradient>
+        <radialGradient id="${id}w" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></radialGradient>
+      </defs>
+      <ellipse cx="102" cy="117" rx="96" ry="6" fill="rgba(0,0,0,.18)"/>
+      <path d="M8 34 L30 18 L196 18 L174 34 Z" fill="url(#${id}t)" stroke="rgba(0,0,0,.18)"/>
+      <path d="M174 34 L196 18 L196 96 L174 112 Z" fill="url(#${id}s)" stroke="rgba(0,0,0,.15)"/>
+      <rect x="8" y="34" width="166" height="78" rx="5" fill="rgba(210,225,235,.18)" stroke="rgba(0,0,0,.18)"/>
+      ${rolls}${more}${label}
+      <rect x="8" y="34" width="166" height="78" rx="5" fill="url(#${id}g)" stroke="rgba(255,255,255,.35)"/>
+      <path d="M16 40 L58 40 L22 104 L16 104 Z" fill="#fff" opacity=".12"/>
+      <rect x="8" y="30" width="166" height="7" rx="3" fill="#c3ccd4" stroke="rgba(0,0,0,.15)"/>
+      <rect x="40" y="31" width="16" height="10" rx="2" fill="#8d99a4"/><rect x="126" y="31" width="16" height="10" rx="2" fill="#8d99a4"/>
+      <g class="lcd"><rect x="178" y="44" width="48" height="42" rx="6" fill="#151a20" stroke="${hc}" stroke-opacity=".55"/>
+        <path d="M202 48 c-2.4 3 -3.6 4.6 -3.6 6 a3.6 3.6 0 0 0 7.2 0 c0 -1.4 -1.2 -3 -3.6 -6z" fill="${hc}" opacity=".8"/>
+        <text x="202" y="72" font-size="16" font-weight="700" text-anchor="middle" fill="${hc}" font-family="ui-monospace,Menlo,Consolas,monospace">${hv}<tspan font-size="9">%</tspan></text>
+        <text x="202" y="82" font-size="8.5" text-anchor="middle" fill="${hc}" fill-opacity=".75" font-family="ui-monospace,Menlo,Consolas,monospace">${tv}</text></g></svg>`;
   };
   const printerSvg = (busy) => `<svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true" class="${busy ? "busy" : ""}">
     <rect x="6" y="6" width="52" height="52" rx="7" fill="var(--g7-soft)" stroke="var(--g7-line)"/>
@@ -90,7 +116,8 @@
     .sp .s{font-size:.78rem;color:var(--g7-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sp .s em{font-style:normal;color:var(--g7-accent)}
     .sp .g{text-align:right;width:76px;font-weight:600;font-size:.9rem;color:var(--g7-text)}
     .more{width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1px solid var(--g7-line);background:none;color:var(--g7-accent);font-weight:600;cursor:pointer;font:inherit}
-    .boxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}.bx .art{margin:6px 0 0}
+    .boxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}.bx .art{margin:4px 0 2px}.bx svg.over .lcd{animation:g7glow 1.6s ease-in-out infinite}@keyframes g7glow{50%{opacity:.55}}
+    .inbox{font-size:.78rem;color:var(--g7-dim);padding:8px 0 0}
     .bx{border:1px solid var(--g7-line);border-radius:12px;padding:10px}.bx.over{border-color:var(--g7-bad);background:color-mix(in srgb,var(--g7-bad) 7%,transparent)}
     .bx .t{font-weight:600;font-size:.88rem;color:var(--g7-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .bx .h{display:flex;align-items:center;gap:4px;font-size:1.25rem;font-weight:700;color:var(--g7-text);margin:4px 0 2px}.bx.over .h{color:var(--g7-bad)}
@@ -200,15 +227,20 @@
       return `<div class="sec"><h3>🖨️ ${esc(L.printers)} <b>${list.length}</b></h3>${rows || `<div class="empty">${esc(L.none)}</div>`}</div>`;
     }
 
-    _stock(L, by) {
+    _sep() { return this._cfg.spools === "separate"; }
+    _stock(L, by, boxes = []) {
       const s = by.filament_total; if (!s) return "";
-      const list = s.attributes.spools || [], grams = num(s.attributes.grams), open = this._open.stock;
+      const every = s.attributes.spools || [], grams = num(s.attributes.grams), open = this._open.stock;
+      const names = new Set(boxes.map((b) => String(b.attributes.name || "").trim()).filter(Boolean));
+      const fold = !this._sep() && this._show.includes("boxes") && names.size;   // 0.8.3 spools: in_boxes (default) — boxes draw theirs
+      const list = fold ? every.filter((p) => !(p.box && names.has(String(p.box).trim()))) : every, boxed = every.length - list.length;
       const shown = open ? list : list.slice(0, 8);
       const rows = shown.map((p) => `<div class="sp">${spoolSvg(colorOf(p), p.pct)}<div class="b"><div class="t">${esc([p.material, p.color].filter(Boolean).join(" · "))}</div>
         <div class="s">${[p.brand ? esc(p.brand) : "", p.box ? `<em>${esc(p.box)}</em>` : ""].filter(Boolean).join(" · ") || "&nbsp;"}</div></div>
         <div class="g">${num(p.grams) !== null ? p.grams.toLocaleString() + " g" : p.pct + "%"}<div class="bar ${p.low ? "low" : ""}"><i style="width:${Math.max(3, Math.min(100, p.pct))}%"></i></div></div></div>`).join("");
       const big = grams ? `<strong>${(grams / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}</strong> <small>kg</small>` : `<strong>${this._val(s)}</strong> <small>${esc(L.rolls)}</small>`;
-      return `<div class="sec"><h3>🧵 ${esc(L.stock)}</h3><div class="big"><span>${big}</span><small>${this._val(s)} ${esc(L.rolls)}</small></div>${rows || `<div class="empty">${esc(L.none)}</div>`}
+      return `<div class="sec"><h3>🧵 ${esc(L.stock)}</h3><div class="big"><span>${big}</span><small>${this._val(s)} ${esc(L.rolls)}</small></div>${rows || (boxed ? "" : `<div class="empty">${esc(L.none)}</div>`)}
+        ${boxed ? `<div class="inbox">📦 ${esc(L.inbox.replace("{n}", boxed))}</div>` : ""}
         ${list.length > 8 ? `<button class="more" data-more="stock">${open ? esc(L.less) : `${esc(L.all)} (${list.length})`}</button>` : ""}</div>`;
     }
 
@@ -217,11 +249,10 @@
       const all = (by.filament_total && by.filament_total.attributes.spools) || [];
       const tiles = boxes.map((s) => {
         const a = s.attributes, h = num(a.humidity), t = num(a.temp);
-        const inside = all.filter((p) => p.box && a.name && String(p.box).trim() === String(a.name).trim());
+        const inside = this._sep() ? null : all.filter((p) => p.box && a.name && String(p.box).trim() === String(a.name).trim());
         return `<div class="bx ${a.over ? "over" : ""}" data-ent="${esc(s.entity_id)}" style="cursor:pointer"><div class="t">📦 ${esc(a.name || s.attributes.friendly_name)}</div>
-          <div class="art">${boxSvg(inside, this._val(s), h, !!a.over)}</div>
-          <div class="h">💧 ${h !== null ? Math.round(h) + "%" : "—"}</div>
-          <div class="s">${t !== null ? `🌡 ${t.toFixed(1)}°C · ` : ""}🧵 ${this._val(s)} ${esc(L.rolls)}${a.low ? ` (${esc(L.low)} ${a.low})` : ""}</div>${a.over ? `<div class="s warn">⚠ ${esc(L.over)}</div>` : ""}</div>`;
+          <div class="art">${boxSvg(inside, this._val(s), h, t, !!a.over)}</div>
+          <div class="s">🧵 ${this._val(s)} ${esc(L.rolls)}${a.low ? ` (${esc(L.low)} ${a.low})` : ""}</div>${a.over ? `<div class="s warn">⚠ ${esc(L.over)}</div>` : ""}</div>`;
       }).join("");
       return `<div class="sec"><h3>📦 ${esc(L.boxes)} <b>${boxes.length}</b></h3><div class="boxes">${tiles}</div></div>`;
     }
@@ -272,8 +303,12 @@
           <select id="site"><option value="">${ko ? "자동 — 데이터가 가장 많은 것" : "Automatic — the one with the most data"}</option>
           ${g.map((k) => `<option value="${esc(k)}" ${this._cfg.site === k ? "selected" : ""}>${esc(k)}</option>`).join("")}</select>
           <b>${ko ? "보여 줄 것 (아무것도 안 고르면 카드 기본)" : "Parts (none = the card's default)"}</b>
-          ${SECTIONS.map((k) => `<label><input type="checkbox" data-k="${k}" ${show.includes(k) ? "checked" : ""}> ${esc(names[k])}</label>`).join("")}</div>`;
+          ${SECTIONS.map((k) => `<label><input type="checkbox" data-k="${k}" ${show.includes(k) ? "checked" : ""}> ${esc(names[k])}</label>`).join("")}
+          <b>${ko ? "필라멘트 롤 보여 주기" : "Filament rolls"}</b>
+          <select id="spools"><option value="">${ko ? "보관함 그림 안에 (재고 목록엔 보관함 밖 롤만)" : "Inside the box pictures (stock list: rolls outside boxes)"}</option>
+          <option value="separate" ${this._cfg.spools === "separate" ? "selected" : ""}>${ko ? "따로 — 재고 목록에 모두, 보관함은 롤 수만" : "Separate — all in the stock list, boxes show the count"}</option></select></div>`;
         this.querySelector("#site").addEventListener("change", (e) => this._set("site", e.target.value || undefined));
+        this.querySelector("#spools").addEventListener("change", (e) => this._set("spools", e.target.value || undefined));
         this.querySelectorAll("input[data-k]").forEach((c) => c.addEventListener("change", () => {
           const v = [...this.querySelectorAll("input[data-k]:checked")].map((x) => x.dataset.k);
           this._set("show", v.length ? v : undefined);
