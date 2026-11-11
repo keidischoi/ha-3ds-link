@@ -7,7 +7,7 @@
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.13";
+  const VER = "0.8.14";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
@@ -46,7 +46,8 @@
     const n = parseInt(m[1], 16), c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(k > 0 ? v + (255 - v) * k : v * (1 + k)));
     return "#" + c.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
   };
-  const boxKind = (name) => {
+  const boxKind = (name, picked) => {
+    if (picked === "bin" || picked === "dryer" || picked === "shelf") return picked;   // 0.8.14 the type picked on the site (IoT link 1.19.14+) first
     const n = String(name || "").toLowerCase();
     if (/건조|드라이|dry/.test(n)) return "dryer";
     if (/선반|랙|진열|shelf|rack/.test(n)) return "shelf";
@@ -150,8 +151,8 @@
       <rect x="2" y="98" width="216" height="10" rx="2" fill="url(#${id}w)"/><rect x="2" y="106" width="216" height="2" fill="rgba(0,0,0,.18)"/>`;
   };
 
-  const boxSvg = (name, spools, count, h, t, over, color) => {
-    const id = "g7b" + (++boxN), kind = boxKind(name), max = kind === "bin" ? 5 : 4;
+  const boxSvg = (name, spools, count, h, t, over, color, picked) => {
+    const id = "g7b" + (++boxN), kind = boxKind(name, picked), max = kind === "bin" ? 5 : 4;
     const show = spools ? spools.slice(0, max) : [], slots = spools ? Math.max(show.length, Math.min(count, max)) : 0;   // 0.8.11 an empty box draws no empty slot
     const draw = kind === "dryer" ? dryerSvg : kind === "shelf" ? shelfSvg : binSvg;
     return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true" class="${over ? "over" : ""}">${draw(id, show, slots, count, h, t, humCol(h, over), spools === null, toneOf(h, over) ? TONE[toneOf(h, over)] : siteTone(color))}</svg>`;
@@ -346,7 +347,7 @@
         const inside = this._sep() ? null : all.filter((p) => p.box && a.name && String(p.box).trim() === String(a.name).trim());
         return `<div class="bx ${a.over ? "over" : toneOf(h, false)}" data-ent="${esc(s.entity_id)}" style="cursor:pointer"><div class="t">${a.color ? `<i class="bxc" style="background:${esc(a.color)}"></i>` : "📦 "}${esc(a.name || s.attributes.friendly_name)}</div>
           ${list ? `<div class="h">💧 ${h !== null ? Math.round(h) + "%" : "—"}</div>${this._mini(inside)}<div class="s">${t !== null ? `🌡 ${t.toFixed(1)}°C · ` : ""}`
-            : `<div class="art">${boxSvg(a.name, inside, this._val(s), h, t, !!a.over, a.color)}</div><div class="s">`}🧵 ${this._val(s)} ${esc(L.rolls)}${a.low ? ` (${esc(L.low)} ${a.low})` : ""}</div>${a.over ? `<div class="s warn">⚠ ${esc(L.over)}</div>` : ""}</div>`;
+            : `<div class="art">${boxSvg(a.name, inside, this._val(s), h, t, !!a.over, a.color, a.kind)}</div><div class="s">`}🧵 ${this._val(s)} ${esc(L.rolls)}${a.low ? ` (${esc(L.low)} ${a.low})` : ""}</div>${a.over ? `<div class="s warn">⚠ ${esc(L.over)}</div>` : ""}</div>`;
       }).join("");
       // 0.8.5 rolls in no box (no box set, or a box name the site has no storage box for) — their own tile
       const names = new Set(boxes.map((b) => String(b.attributes.name || "").trim()).filter(Boolean));
