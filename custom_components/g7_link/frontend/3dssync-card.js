@@ -7,7 +7,7 @@
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.12";
+  const VER = "0.8.13";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
@@ -56,6 +56,8 @@
   const TONE = { "": { lid: "#5b8def", lid2: "#3f6fd1", tint: "transparent", edge: "rgba(150,165,180,.6)" },
     warn: { lid: "#f59e0b", lid2: "#d97706", tint: "rgba(245,158,11,.16)", edge: "rgba(245,158,11,.85)" },
     bad: { lid: "#ef4444", lid2: "#c53030", tint: "rgba(239,68,68,.22)", edge: "rgba(239,68,68,.9)" } };
+  // 0.8.13 🎨 the site's box colour (IoT link 1.19.13+) paints the lid / edges; a humidity warning still wins
+  const siteTone = (c) => /^#[0-9a-f]{6}$/i.test(String(c || "")) ? { lid: c, lid2: shade(c, -0.22), tint: c + "14", edge: c } : TONE[""];
   const toneOf = (h, over) => over ? "bad" : h !== null && h >= 50 ? "warn" : "";
   const humCol = (h, over) => h === null ? "#8a929c" : over ? "#ef4444" : h >= 50 ? "#f59e0b" : "#22c55e";
   const pctOf = (p) => Math.max(0, Math.min(100, p.pct ?? 100));
@@ -148,11 +150,11 @@
       <rect x="2" y="98" width="216" height="10" rx="2" fill="url(#${id}w)"/><rect x="2" y="106" width="216" height="2" fill="rgba(0,0,0,.18)"/>`;
   };
 
-  const boxSvg = (name, spools, count, h, t, over) => {
+  const boxSvg = (name, spools, count, h, t, over, color) => {
     const id = "g7b" + (++boxN), kind = boxKind(name), max = kind === "bin" ? 5 : 4;
     const show = spools ? spools.slice(0, max) : [], slots = spools ? Math.max(show.length, Math.min(count, max)) : 0;   // 0.8.11 an empty box draws no empty slot
     const draw = kind === "dryer" ? dryerSvg : kind === "shelf" ? shelfSvg : binSvg;
-    return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true" class="${over ? "over" : ""}">${draw(id, show, slots, count, h, t, humCol(h, over), spools === null, TONE[toneOf(h, over)])}</svg>`;
+    return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true" class="${over ? "over" : ""}">${draw(id, show, slots, count, h, t, humCol(h, over), spools === null, toneOf(h, over) ? TONE[toneOf(h, over)] : siteTone(color))}</svg>`;
   };
   // 0.8.5 rolls in no storage box: standing on a bare desk, a dashed outline where a box would be (no humidity — open air)
   const looseSvg = (spools, count) => {
@@ -203,7 +205,7 @@
     .bx svg.over .lcd{animation:g7glow 1.6s ease-in-out infinite}@keyframes g7glow{50%{opacity:.55}}
     .inbox{font-size:.78rem;color:var(--g7-dim);padding:8px 0 0}
     .bx{border:1px solid var(--g7-line);border-radius:12px;padding:10px}.bx.over{border-color:var(--g7-bad);background:color-mix(in srgb,var(--g7-bad) 7%,transparent)}.bx.warn{border-color:#f59e0b;background:color-mix(in srgb,#f59e0b 6%,transparent)}
-    .bx .t{font-weight:600;font-size:.88rem;color:var(--g7-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bx .t .bxc{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}.bx .t{font-weight:600;font-size:.88rem;color:var(--g7-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .bx .h{display:flex;align-items:center;gap:4px;font-size:1.25rem;font-weight:700;color:var(--g7-text);margin:4px 0 2px}.bx.over .h{color:var(--g7-bad)}
     .bx .s{font-size:.75rem;color:var(--g7-dim)}.bx .s.warn{color:var(--g7-bad);font-weight:600;margin-top:2px}
     .dv{display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--g7-line)}.dv:last-of-type{border-bottom:0}
@@ -342,9 +344,9 @@
       const tiles = boxes.map((s) => {
         const a = s.attributes, h = num(a.humidity), t = num(a.temp);
         const inside = this._sep() ? null : all.filter((p) => p.box && a.name && String(p.box).trim() === String(a.name).trim());
-        return `<div class="bx ${a.over ? "over" : toneOf(h, false)}" data-ent="${esc(s.entity_id)}" style="cursor:pointer"><div class="t">📦 ${esc(a.name || s.attributes.friendly_name)}</div>
+        return `<div class="bx ${a.over ? "over" : toneOf(h, false)}" data-ent="${esc(s.entity_id)}" style="cursor:pointer"><div class="t">${a.color ? `<i class="bxc" style="background:${esc(a.color)}"></i>` : "📦 "}${esc(a.name || s.attributes.friendly_name)}</div>
           ${list ? `<div class="h">💧 ${h !== null ? Math.round(h) + "%" : "—"}</div>${this._mini(inside)}<div class="s">${t !== null ? `🌡 ${t.toFixed(1)}°C · ` : ""}`
-            : `<div class="art">${boxSvg(a.name, inside, this._val(s), h, t, !!a.over)}</div><div class="s">`}🧵 ${this._val(s)} ${esc(L.rolls)}${a.low ? ` (${esc(L.low)} ${a.low})` : ""}</div>${a.over ? `<div class="s warn">⚠ ${esc(L.over)}</div>` : ""}</div>`;
+            : `<div class="art">${boxSvg(a.name, inside, this._val(s), h, t, !!a.over, a.color)}</div><div class="s">`}🧵 ${this._val(s)} ${esc(L.rolls)}${a.low ? ` (${esc(L.low)} ${a.low})` : ""}</div>${a.over ? `<div class="s warn">⚠ ${esc(L.over)}</div>` : ""}</div>`;
       }).join("");
       // 0.8.5 rolls in no box (no box set, or a box name the site has no storage box for) — their own tile
       const names = new Set(boxes.map((b) => String(b.attributes.name || "").trim()).filter(Boolean));

@@ -155,7 +155,7 @@ Card options (all can be set in the card editor too):
 | `spools` | `separate` — box pictures show only the numbers, big; every roll stays in the stock list | rolls drawn inside the boxes |
 | `hide_where` | `true` — hide the 📍 server · scope line | shown when you have more than one |
 
-**Storage box pictures.** The box sensor's humidity and temperature are on one line at the top (green under 50 %, orange from 50 %, red and blinking over the box's limit, 📡 *No sensor* when none is attached) — the picture itself turns orange from 50 % and red over the limit (bin lid, dryer body, shelf back), and the rolls stand below in their real colours, filled by what is left. 🧪 Resin is drawn as a bottle (amber body, its colour filled by what is left) and counted on its own: the stock card shows *N rolls · 🧪 resin M bottles*, and the kg total is filament only. The box name picks the picture:
+**Storage box pictures.** The box sensor's humidity and temperature are on one line at the top (green under 50 %, orange from 50 %, red and blinking over the box's limit, 📡 *No sensor* when none is attached) — otherwise the box keeps **its colour from the site** (bin lid, dryer and shelf edges, the dot before its name; IoT link 1.19.13+), and the picture turns orange from 50 % and red over the limit, and the rolls stand below in their real colours, filled by what is left. 🧪 Resin is drawn as a bottle (amber body, its colour filled by what is left) and counted on its own: the stock card shows *N rolls · 🧪 resin M bottles*, and the kg total is filament only. The box name picks the picture:
 
 | Box name contains | Picture | Rolls drawn |
 |---|---|---|
