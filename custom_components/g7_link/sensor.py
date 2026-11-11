@@ -97,8 +97,16 @@ class Ctx:
         cat = CAT_KEY.get(cat, cat)
         en, ko = CATS.get(cat, (cat, cat))
         name = ko if self.ko else en
+        parent = f"status:{self.uid}" if self.scope == "all" else f"status:{self.base}"   # 0.7.1 categories sit under their personal / company device
         return {"identifiers": {(DOMAIN, f"status:{self.base}:{cat}")}, "name": f"{self.scope_name} {name}".strip(),
-                "manufacturer": "3DS", "model": "3DSSync", "via_device": (DOMAIN, f"status:{self.uid}"), "configuration_url": self.site}
+                "manufacturer": "3DS", "model": "3DSSync", "via_device": (DOMAIN, parent), "configuration_url": self.site}
+
+    def scope_device(self) -> dict[str, Any] | None:
+        """0.7.1 👤 personal / 🏢 company — groups that scope's category devices (site → scope → category)."""
+        if self.scope == "all":
+            return None
+        return {"identifiers": {(DOMAIN, f"status:{self.base}")}, "name": f"3DSSync {self.scope_name}", "manufacturer": "3DS",
+                "model": "Personal" if self.scope == "me" else "Company", "via_device": (DOMAIN, f"status:{self.uid}"), "configuration_url": self.site}
 
 
 OWNERS = "_status_owners"   # hass.data[DOMAIN][OWNERS] = {(site, code): entry_id}
@@ -143,6 +151,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             await coord.async_refresh()
         ctx = Ctx(hass, site, uid, scope, names.get(scope, ""))
         keep.append(ctx.base + "|")
+        if (sd := ctx.scope_device()) is not None:
+            dr.async_get(hass).async_get_or_create(config_entry_id=entry.entry_id, **sd)
         _setup_scope(hass, entry, coord, ctx, async_add_entities)
     if probe.last_update_success:
         _cleanup(hass, entry, uid, keep)
