@@ -5,7 +5,7 @@
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.1";
+  const VER = "0.8.2";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
@@ -32,6 +32,31 @@
     const r = 15, fill = Math.max(4, Math.min(15, 5 + (pct ?? 100) / 10));
     return `<svg width="${size}" height="${size}" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="${r + 1}" fill="#8b9099"/><circle cx="17" cy="17" r="${r}" fill="#d9dce1"/>` +
       `<circle cx="17" cy="17" r="${fill}" fill="${esc(hex)}" stroke="rgba(0,0,0,.18)" stroke-width=".6"/><circle cx="17" cy="17" r="4.4" fill="#5b616b"/><circle cx="17" cy="17" r="1.8" fill="#e8eaee"/></svg>`;
+  };
+  // 0.8.2 storage box picture: clear front, spools inside (real colours, fill = what is left), hygrometer with the humidity
+  const boxSvg = (spools, count, h, over) => {
+    const W = 200, show = spools.slice(0, 4), slots = Math.max(show.length, Math.min(count, 4), 1), gap = 148 / slots;
+    const hc = h === null ? "var(--g7-dim)" : over ? "var(--g7-bad)" : h >= 50 ? "#e0902a" : "var(--g7-ok)";
+    const level = h === null ? 0 : Math.max(0, Math.min(100, h));
+    let rolls = "";
+    for (let i = 0; i < slots; i++) {
+      const p = show[i], cx = 14 + gap * i + gap / 2, r = Math.min(19, gap / 2 - 2);
+      if (!p) { rolls += `<circle cx="${cx}" cy="44" r="${r}" fill="none" stroke="var(--g7-line)" stroke-dasharray="3 3"/>`; continue; }
+      const fill = r * (0.45 + 0.55 * Math.max(0, Math.min(100, p.pct ?? 100)) / 100);
+      rolls += `<g><circle cx="${cx}" cy="44" r="${r}" fill="#9aa0a8"/><circle cx="${cx}" cy="44" r="${r - 1.4}" fill="#d9dce1"/>` +
+        `<circle cx="${cx}" cy="44" r="${fill}" fill="${esc(colorOf(p))}" stroke="rgba(0,0,0,.18)" stroke-width=".6"/><circle cx="${cx}" cy="44" r="${r * 0.3}" fill="#5b616b"/>` +
+        `<circle cx="${cx}" cy="44" r="${r * 0.12}" fill="#eef0f3"/></g>`;
+    }
+    const more = count > slots ? `<text x="158" y="72" font-size="9" text-anchor="end" fill="var(--g7-dim)">+${count - slots}</text>` : "";
+    return `<svg viewBox="0 0 ${W} 78" width="100%" height="78" aria-hidden="true">
+      <rect x="4" y="12" width="160" height="62" rx="8" fill="var(--g7-soft)" stroke="var(--g7-line)"/>
+      <rect x="2" y="6" width="164" height="10" rx="4" fill="var(--g7-dim)" opacity=".55"/>
+      ${rolls}${more}
+      <rect x="6" y="18" width="156" height="54" rx="6" fill="rgba(160,200,230,.10)" stroke="rgba(255,255,255,.18)"/>
+      <path d="M12 22 L30 22 L16 40" fill="rgba(255,255,255,.10)"/>
+      <rect x="174" y="12" width="20" height="62" rx="10" fill="var(--g7-soft)" stroke="var(--g7-line)"/>
+      <rect x="180" y="${18 + 50 * (1 - level / 100)}" width="8" height="${50 * level / 100}" rx="4" fill="${hc}"/>
+      <path d="M184 4 C180 9 178 11 178 13.5 a6 6 0 0 0 12 0 C190 11 188 9 184 4z" fill="${hc}"/></svg>`;
   };
   const printerSvg = (busy) => `<svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true" class="${busy ? "busy" : ""}">
     <rect x="6" y="6" width="52" height="52" rx="7" fill="var(--g7-soft)" stroke="var(--g7-line)"/>
@@ -65,7 +90,7 @@
     .sp .s{font-size:.78rem;color:var(--g7-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sp .s em{font-style:normal;color:var(--g7-accent)}
     .sp .g{text-align:right;width:76px;font-weight:600;font-size:.9rem;color:var(--g7-text)}
     .more{width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1px solid var(--g7-line);background:none;color:var(--g7-accent);font-weight:600;cursor:pointer;font:inherit}
-    .boxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+    .boxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}.bx .art{margin:6px 0 0}
     .bx{border:1px solid var(--g7-line);border-radius:12px;padding:10px}.bx.over{border-color:var(--g7-bad);background:color-mix(in srgb,var(--g7-bad) 7%,transparent)}
     .bx .t{font-weight:600;font-size:.88rem;color:var(--g7-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .bx .h{display:flex;align-items:center;gap:4px;font-size:1.25rem;font-weight:700;color:var(--g7-text);margin:4px 0 2px}.bx.over .h{color:var(--g7-bad)}
@@ -189,9 +214,12 @@
 
     _boxes(L, by, boxes) {
       if (!boxes.length) return "";
+      const all = (by.filament_total && by.filament_total.attributes.spools) || [];
       const tiles = boxes.map((s) => {
         const a = s.attributes, h = num(a.humidity), t = num(a.temp);
+        const inside = all.filter((p) => p.box && a.name && String(p.box).trim() === String(a.name).trim());
         return `<div class="bx ${a.over ? "over" : ""}" data-ent="${esc(s.entity_id)}" style="cursor:pointer"><div class="t">📦 ${esc(a.name || s.attributes.friendly_name)}</div>
+          <div class="art">${boxSvg(inside, this._val(s), h, !!a.over)}</div>
           <div class="h">💧 ${h !== null ? Math.round(h) + "%" : "—"}</div>
           <div class="s">${t !== null ? `🌡 ${t.toFixed(1)}°C · ` : ""}🧵 ${this._val(s)} ${esc(L.rolls)}${a.low ? ` (${esc(L.low)} ${a.low})` : ""}</div>${a.over ? `<div class="s warn">⚠ ${esc(L.over)}</div>` : ""}</div>`;
       }).join("");
