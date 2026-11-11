@@ -3,20 +3,20 @@
  *   type: custom:g7-3dssync-card          everything
  *   show: [summary, printers, stock, boxes, sensors]   (optional — pick parts)
  *   box_look: list                       (optional — the earlier text tiles instead of box pictures)
- *   spools: separate                     (optional — rolls only in the stock list; default draws them inside the box pictures)
+ *   spools: in_boxes                     (optional — draw the rolls inside the box pictures; default shows temperature · humidity there)
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.5";
+  const VER = "0.8.6";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
       unread: "알림", orders: "주문", bids: "입찰", low: "조금 남음", live: "통신 중", lost: "끊김", never: "안 옴", none: "아직 없어요",
-      over: "습도 높음", nodata: "3DSSync 센서를 찾지 못했어요 — 통합을 먼저 연결하세요.", ago_m: "분 전", ago_h: "시간 전", ago_d: "일 전", now: "방금", min: "분", h: "시간", company: "업체", inbox: "보관함에 든 {n}롤은 아래 보관함 그림에", outside: "보관함 밖" },
+      over: "습도 높음", nodata: "3DSSync 센서를 찾지 못했어요 — 통합을 먼저 연결하세요.", ago_m: "분 전", ago_h: "시간 전", ago_d: "일 전", now: "방금", min: "분", h: "시간", company: "업체", inbox: "보관함에 든 {n}롤은 아래 보관함 그림에", outside: "보관함 밖", nosensor: "센서 없음" },
     en: { printers: "Printers", stock: "Filament stock", boxes: "Storage boxes", sensors: "Connected sensors", rolls: "rolls", all: "Show all", less: "Show less",
       idle: "Idle", printing: "Printing", paused: "Paused", done: "Done", failed: "Failed", offline: "Off", left: "left", nozzle: "Nozzle", bed: "Bed",
       unread: "Notices", orders: "Orders", bids: "Bids", low: "Low", live: "Live", lost: "Lost", never: "Never", none: "Nothing yet",
-      over: "Too humid", nodata: "No 3DSSync sensors found — set up the integration first.", ago_m: "min ago", ago_h: "h ago", ago_d: "d ago", now: "just now", min: "min", h: "h", company: "Company", inbox: "{n} rolls in storage boxes are drawn in the boxes below", outside: "Not in a box" },
+      over: "Too humid", nodata: "No 3DSSync sensors found — set up the integration first.", ago_m: "min ago", ago_h: "h ago", ago_d: "d ago", now: "just now", min: "min", h: "h", company: "Company", inbox: "{n} rolls in storage boxes are drawn in the boxes below", outside: "Not in a box", nosensor: "No sensor" },
   };
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const num = (v) => (typeof v === "number" && isFinite(v) ? v : null);
@@ -63,6 +63,12 @@
   };
   const rollGrad = (id) => `<radialGradient id="${id}r" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#000" stop-opacity=".2"/></radialGradient>`;
 
+  // 0.8.6 the box picture shows the box's temperature · humidity big (rolls stay in the stock list unless spools: in_boxes)
+  let NOSENSOR = "no sensor";
+  const readout = (cx, y1, y2, h, t, hc, tc) => h === null && t === null
+    ? `<text x="${cx}" y="${(y1 + y2) / 2}" font-size="14" font-weight="700" text-anchor="middle" fill="#8a929c">📡 ${esc(NOSENSOR)}</text>`
+    : `<g class="lcd"><text x="${cx}" y="${y1}" font-size="30" font-weight="800" text-anchor="middle" fill="${hc}">💧${h === null ? "--" : Math.round(h)}<tspan font-size="16">%</tspan></text></g>
+      <text x="${cx}" y="${y2}" font-size="16" font-weight="700" text-anchor="middle" fill="${tc}">🌡 ${t === null ? "--" : t.toFixed(1)}<tspan font-size="11">°C</tspan></text>`;
   const binSvg = (id, show, slots, count, h, t, hc) => {
     const X0 = 16, X1 = 156, gap = (X1 - X0) / Math.max(slots, 1), w = Math.min(28, gap - 5);
     let rolls = "";
@@ -76,7 +82,7 @@
         <rect x="${x}" y="44" width="4" height="70" rx="2" fill="#3a4049"/><rect x="${x + w - 4}" y="44" width="4" height="70" rx="2" fill="#3a4049"/>`;
     }
     const more = slots && count > slots ? `<text x="154" y="120" font-size="10" font-weight="700" text-anchor="end" fill="#6b7480">+${count - slots}</text>` : "";
-    const label = slots ? "" : `<text x="86" y="90" font-size="26" font-weight="700" text-anchor="middle" fill="#8a929c">${count}</text>`;
+    const label = slots ? "" : readout(110, 86, 112, h, t, hc, "#4b5563");
     const rad = (h === null ? -120 : -120 + 240 * Math.min(100, Math.max(0, h)) / 100) * Math.PI / 180;
     const arc = (a) => `${186 + 16 * Math.sin(a)} ${80 - 16 * Math.cos(a)}`;
     const body = "M10 34 L210 34 L204 120 Q203 124 199 124 L21 124 Q17 124 16 120 Z";
@@ -86,11 +92,11 @@
       ${shadow}<path d="${body}" fill="#eef3f7" stroke="#b9c3cc"/>${rolls}${label}<path d="${body}" fill="url(#${id}g)" stroke="#b9c3cc"/>
       <rect x="4" y="22" width="212" height="14" rx="5" fill="#5b8def"/><rect x="4" y="32" width="212" height="4" fill="#3f6fd1"/>
       <rect x="30" y="30" width="20" height="16" rx="3" fill="#3f6fd1"/><rect x="170" y="30" width="20" height="16" rx="3" fill="#3f6fd1"/>${more}
-      <g class="lcd"><circle cx="186" cy="80" r="22" fill="#fff" stroke="${hc}" stroke-width="3"/>
+      ${slots ? `<g class="lcd"><circle cx="186" cy="80" r="22" fill="#fff" stroke="${hc}" stroke-width="3"/>
         <path d="M${arc(-2.094)} A16 16 0 1 1 ${arc(2.094)}" fill="none" stroke="#e3e7ec" stroke-width="3"/>
         <line x1="186" y1="80" x2="${186 + 15 * Math.sin(rad)}" y2="${80 - 15 * Math.cos(rad)}" stroke="#222" stroke-width="2" stroke-linecap="round"/><circle cx="186" cy="80" r="2.5" fill="#222"/>
         <text x="186" y="96" font-size="8.5" font-weight="700" text-anchor="middle" fill="${hc}">${h === null ? "--" : Math.round(h)}%</text></g>
-      ${t === null ? "" : `<text x="186" y="115" font-size="8.5" text-anchor="middle" fill="#6b7480">${t.toFixed(1)}°C</text>`}`;
+      ${t === null ? "" : `<text x="186" y="115" font-size="8.5" text-anchor="middle" fill="#6b7480">${t.toFixed(1)}°C</text>`}` : ""}`;
   };
 
   const dryerSvg = (id, show, slots, count, h, t, hc) => {
@@ -100,7 +106,7 @@
       const p = show[i], cx = X0 + gap * i + gap / 2;
       rolls += p ? faceRoll(id, p, cx, cy, r, "#2b3038") : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#6b7480" stroke-dasharray="3 3"/>`;
     }
-    const label = slots ? "" : `<text x="110" y="74" font-size="26" font-weight="700" text-anchor="middle" fill="#cfd5dc">${count}</text>`;
+    const label = slots ? "" : readout(110, 68, 92, h, t, hc, "#e5e7eb");
     return `<defs>${rollGrad(id)}
       <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfe4ea"/></linearGradient>
       <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".4" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
@@ -108,9 +114,9 @@
       <rect x="8" y="14" width="204" height="110" rx="16" fill="url(#${id}b)" stroke="#c4cbd3"/>
       <rect x="18" y="26" width="184" height="76" rx="10" fill="#1d2229"/>${rolls}${label}<rect x="18" y="26" width="184" height="76" rx="10" fill="url(#${id}g)"/>
       ${slots && count > slots ? `<text x="196" y="97" font-size="10" font-weight="700" text-anchor="end" fill="#cfd5dc">+${count - slots}</text>` : ""}
-      <g class="lcd"><rect x="70" y="107" width="80" height="13" rx="4" fill="#111418"/>
+      ${slots ? `<g class="lcd"><rect x="70" y="107" width="80" height="13" rx="4" fill="#111418"/>
         <text x="110" y="117" font-size="9.5" font-weight="700" text-anchor="middle" fill="${hc}" font-family="ui-monospace,Consolas,monospace">💧${h === null ? "--" : Math.round(h)}%${t === null ? "" : "  " + t.toFixed(0) + "°C"}</text>
-        <circle cx="58" cy="113.5" r="2.5" fill="${hc}"/></g>
+        <circle cx="58" cy="113.5" r="2.5" fill="${hc}"/></g>` : `<circle cx="58" cy="113.5" r="2.5" fill="${hc}"/>`}
       <circle cx="164" cy="113.5" r="3.5" fill="#c4cbd3"/><circle cx="176" cy="113.5" r="3.5" fill="#c4cbd3"/>`;
   };
 
@@ -121,7 +127,7 @@
       const p = show[i], cx = X0 + gap * i + gap / 2;
       rolls += p ? faceRoll(id, p, cx, cy, r, "#3a4049") : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#b8c0ca" stroke-dasharray="3 3"/>`;
     }
-    const label = slots ? "" : `<text x="110" y="84" font-size="26" font-weight="700" text-anchor="middle" fill="#8a929c">${count}</text>`;
+    const label = slots ? "" : readout(110, 56, 84, h, t, hc, "#4b5563");
     return `<defs>${rollGrad(id)}
       <linearGradient id="${id}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9b48a"/><stop offset="1" stop-color="#a97a4e"/></linearGradient></defs>
       <rect x="4" y="10" width="212" height="88" rx="4" fill="#f3f4f6" stroke="#e1e4e8"/>
@@ -130,8 +136,8 @@
       ${rolls}${label}
       ${slots && count > slots ? `<text x="206" y="24" font-size="10" font-weight="700" text-anchor="end" fill="#6b7480">+${count - slots}</text>` : ""}
       <rect x="2" y="98" width="216" height="10" rx="2" fill="url(#${id}w)"/><rect x="2" y="106" width="216" height="2" fill="rgba(0,0,0,.18)"/>
-      <g class="lcd"><rect x="80" y="110" width="60" height="16" rx="4" fill="#111418" stroke="${hc}" stroke-opacity=".6"/>
-        <text x="110" y="121.5" font-size="9.5" font-weight="700" text-anchor="middle" fill="${hc}" font-family="ui-monospace,Consolas,monospace">${h === null ? "--" : Math.round(h)}%${t === null ? "" : " " + t.toFixed(0) + "°"}</text></g>`;
+      ${slots ? `<g class="lcd"><rect x="80" y="110" width="60" height="16" rx="4" fill="#111418" stroke="${hc}" stroke-opacity=".6"/>
+        <text x="110" y="121.5" font-size="9.5" font-weight="700" text-anchor="middle" fill="${hc}" font-family="ui-monospace,Consolas,monospace">${h === null ? "--" : Math.round(h)}%${t === null ? "" : " " + t.toFixed(0) + "°"}</text></g>` : ""}`;
   };
 
   const boxSvg = (name, spools, count, h, t, over) => {
@@ -182,7 +188,7 @@
     .big{display:flex;justify-content:space-between;align-items:baseline;margin:-4px 0 6px}.big strong{font-size:2rem;color:var(--g7-text)}.big small{font-size:.9rem;color:var(--g7-dim)}
     .sp{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--g7-line)}.sp:last-of-type{border-bottom:0}
     .sp .b{flex:1;min-width:0}.sp .t{font-weight:600;font-size:.92rem;color:var(--g7-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .sp .s{font-size:.78rem;color:var(--g7-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sp .s em{font-style:normal;color:var(--g7-accent)}
+    .sp .s{font-size:.78rem;color:var(--g7-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sp .s em{font-style:normal;color:var(--g7-accent)}.sp .s em.out{color:var(--g7-dim)}
     .sp .g{text-align:right;width:76px;font-weight:600;font-size:.9rem;color:var(--g7-text)}
     .more{width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1px solid var(--g7-line);background:none;color:var(--g7-accent);font-weight:600;cursor:pointer;font:inherit}
     .boxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}.bx .art{margin:4px 0 2px}.boxes.list{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.mini{display:flex;flex-wrap:wrap;gap:2px;align-items:center;margin:2px 0 4px}.mini small{font-size:.7rem;color:var(--g7-dim)}.bx.loose{border-style:dashed}
@@ -259,6 +265,7 @@
     _render() {
       if (!this.shadowRoot) this.attachShadow({ mode: "open" });
       const L = this._t(), { by, boxes } = this._data();
+      NOSENSOR = L.nosensor;
       const parts = Object.keys(by).length ? this._show.map((k) => this["_" + k] ? this["_" + k](L, by, boxes) : "").join("") : `<div class="empty">${esc(L.nodata)}</div>`;
       const where = this._many && !this._cfg.hide_where ? `<div class="where">📍 ${esc(this._site)}</div>` : "";   // 0.7.0 which server · scope this card shows
       this.shadowRoot.innerHTML = `<style>${CSS}</style><ha-card>${where}${parts}</ha-card>`;
@@ -301,7 +308,7 @@
       if (!sp || !sp.length) return "";
       return `<div class="mini">${sp.slice(0, 8).map((p) => spoolSvg(colorOf(p), p.pct, 18)).join("")}${sp.length > 8 ? `<small>+${sp.length - 8}</small>` : ""}</div>`;
     }
-    _sep() { return this._cfg.spools === "separate"; }
+    _sep() { return this._cfg.spools !== "in_boxes"; }   // 0.8.6 default = the box picture shows temperature · humidity only
     _stock(L, by, boxes = []) {
       const s = by.filament_total; if (!s) return "";
       const every = s.attributes.spools || [], grams = num(s.attributes.grams), open = this._open.stock;
@@ -310,7 +317,7 @@
       const list = fold ? every.filter((p) => !(p.box && names.has(String(p.box).trim()))) : every, boxed = every.length - list.length;
       const shown = open ? list : list.slice(0, 8);
       const rows = shown.map((p) => `<div class="sp">${spoolSvg(colorOf(p), p.pct)}<div class="b"><div class="t">${esc([p.material, p.color].filter(Boolean).join(" · "))}</div>
-        <div class="s">${[p.brand ? esc(p.brand) : "", p.box ? `<em>${esc(p.box)}</em>` : ""].filter(Boolean).join(" · ") || "&nbsp;"}</div></div>
+        <div class="s">${[p.brand ? esc(p.brand) : "", p.box && names.has(String(p.box).trim()) ? `<em>📦 ${esc(p.box)}</em>` : `<em class="out">${esc(L.outside)}</em>`].filter(Boolean).join(" · ") || "&nbsp;"}</div></div>
         <div class="g">${num(p.grams) !== null ? p.grams.toLocaleString() + " g" : p.pct + "%"}<div class="bar ${p.low ? "low" : ""}"><i style="width:${Math.max(3, Math.min(100, p.pct))}%"></i></div></div></div>`).join("");
       const big = grams ? `<strong>${(grams / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}</strong> <small>kg</small>` : `<strong>${this._val(s)}</strong> <small>${esc(L.rolls)}</small>`;
       return `<div class="sec"><h3>🧵 ${esc(L.stock)}</h3><div class="big"><span>${big}</span><small>${this._val(s)} ${esc(L.rolls)}</small></div>${rows || (boxed ? "" : `<div class="empty">${esc(L.none)}</div>`)}
@@ -389,8 +396,8 @@
           <select id="box_look"><option value="">${ko ? "그림 (건조기 · 선반 · 수납함)" : "Pictures (dryer · shelf · bin)"}</option>
           <option value="list" ${this._cfg.box_look === "list" ? "selected" : ""}>${ko ? "목록 (예전 모양 — 습도 숫자 크게)" : "List (the earlier look — big humidity number)"}</option></select>
           <b>${ko ? "필라멘트 롤 보여 주기" : "Filament rolls"}</b>
-          <select id="spools"><option value="">${ko ? "보관함 그림 안에 (재고 목록엔 보관함 밖 롤만)" : "Inside the box pictures (stock list: rolls outside boxes)"}</option>
-          <option value="separate" ${this._cfg.spools === "separate" ? "selected" : ""}>${ko ? "따로 — 재고 목록에 모두, 보관함은 롤 수만" : "Separate — all in the stock list, boxes show the count"}</option></select></div>`;
+          <select id="spools"><option value="">${ko ? "따로 — 보관함 그림엔 온습도만, 롤은 재고 목록에" : "Separate — box pictures show temperature · humidity, rolls in the stock list"}</option>
+          <option value="in_boxes" ${this._cfg.spools === "in_boxes" ? "selected" : ""}>${ko ? "보관함 그림 안에 롤도 (재고 목록엔 보관함 밖 롤만)" : "Rolls inside the box pictures (stock list: rolls outside boxes)"}</option></select></div>`;
         this.querySelector("#site").addEventListener("change", (e) => this._set("site", e.target.value || undefined));
         this.querySelector("#box_look").addEventListener("change", (e) => this._set("box_look", e.target.value || undefined));
         this.querySelector("#spools").addEventListener("change", (e) => this._set("spools", e.target.value || undefined));
