@@ -2,7 +2,10 @@
   "domain": "g7_link",
   "name": "3DSSync",
   "after_dependencies": [
-    "camera"
+    "camera",
+    "frontend",
+    "http",
+    "panel_custom"
   ],
   "codeowners": [
     "@keidischoi"
@@ -14,5 +17,5 @@
   "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/keidischoi/ha-3ds-link/issues",
   "requirements": [],
-  "version": "0.5.0"
+  "version": "0.6.0"
 }

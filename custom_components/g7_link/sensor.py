@@ -37,10 +37,14 @@ SENSORS: tuple[tuple[str, str, str, str, str, str | None, tuple[str, ...]], ...]
     ("bids_waiting", "jobs", "bids_waiting", "Bids on my requests", "mdi:hammer-wrench", None, ("bids_new_24h", "my_open")),
     ("my_bids", "jobs", "my_bids_pending", "My pending bids", "mdi:handshake", None, ()),
     ("jobs_open", "jobs", "site_open", "Open print requests", "mdi:clipboard-list", None, ()),
-    ("filament_total", "filament", "total", "Filament rolls", "mdi:printer-3d-nozzle", "rolls", ("resin",)),
+    ("filament_total", "filament", "total", "Filament rolls", "mdi:printer-3d-nozzle", "rolls", ("resin", "grams")),
     ("filament_low", "filament", "low", "Filament running low", "mdi:alert-circle-outline", "rolls", ("low_list",)),
     ("filament_empty", "filament", "empty", "Filament used up", "mdi:close-circle-outline", "rolls", ()),
 )
+
+
+# 0.6.0 big lists for the cards — kept out of the recorder (history database)
+BIG = frozenset({"spools", "printers", "devices", "low_list", "g7", "site"})
 
 
 class StatusCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -92,6 +96,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     host = urlparse(site).netloc or site
     uid = host + ":" + hashlib.sha1(code.encode()).hexdigest()[:10]   # two accounts on one site stay apart · the code itself is not shown
     ents: list[SensorEntity] = [StatusSensor(coord, uid, site, *s) for s in SENSORS]
+    ents.append(ListSensor(coord, uid, site, "printers", "mdi:printer-3d", lambda p: p.get("state") in ("printing", "paused")))   # 0.6.0 state = printing now
+    ents.append(ListSensor(coord, uid, site, "devices", "mdi:access-point-network", lambda d: bool(d.get("live"))))           # 0.6.0 state = sensors talking to the site
     for box in (coord.data or {}).get("boxes") or []:
         if isinstance(box, dict) and box.get("key"):
             ents.append(BoxSensor(coord, uid, site, str(box["key"]), str(box.get("name") or box["key"])))
@@ -101,10 +107,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class StatusSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
     _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _unrecorded_attributes = BIG
 
     def __init__(self, coord: StatusCoordinator, uid: str, site: str, key: str, section: str, field: str, name: str, icon: str, unit: str | None, attrs: tuple[str, ...]) -> None:
         super().__init__(coord)
         self._section, self._field, self._attrs = section, field, attrs
+        self._key, self._site = key, uid.split(":")[0]
         self._attr_unique_id = f"{uid}:{key}"
         self._attr_translation_key = key   # Korean / English names from translations/*.json (entity.sensor.<key>)
         self._attr_icon = icon
@@ -128,7 +136,10 @@ class StatusSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         part = self._part() or {}
-        return {k: part.get(k) for k in self._attrs if k in part}
+        out = {k: part.get(k) for k in self._attrs if k in part}
+        if self._key == "filament_total":   # 0.6.0 every spool for the stock card
+            out["spools"] = (self.coordinator.data or {}).get("spools") or []
+        return {**out, "g7": self._key, "site": self._site}
 
 
 class BoxSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
@@ -138,10 +149,11 @@ class BoxSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:archive-outline"
     _attr_native_unit_of_measurement = "rolls"
+    _unrecorded_attributes = BIG
 
     def __init__(self, coord: StatusCoordinator, uid: str, site: str, key: str, name: str) -> None:
         super().__init__(coord)
-        self._key = key
+        self._key, self._site = key, uid.split(":")[0]
         self._attr_unique_id = f"{uid}:box:{hashlib.sha1(key.encode()).hexdigest()[:10]}"
         self._attr_translation_key = "box"
         self._attr_translation_placeholders = {"name": name}
@@ -170,4 +182,38 @@ class BoxSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         b = self._box() or {}
-        return {k: b.get(k) for k in ("name", "low", "humidity", "temp", "humidity_max", "over", "seen_at")}
+        return {**{k: b.get(k) for k in ("name", "low", "humidity", "temp", "humidity_max", "over", "seen_at")}, "g7": "box", "site": self._site}
+
+
+class ListSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
+    """0.6.0 a list from the site (printers · connected sensors): state = how many are active, the list in attributes."""
+
+    _attr_has_entity_name = True
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _unrecorded_attributes = BIG
+
+    def __init__(self, coord: StatusCoordinator, uid: str, site: str, key: str, icon: str, active: Any) -> None:
+        super().__init__(coord)
+        self._key, self._site, self._active = key, uid.split(":")[0], active
+        self._attr_unique_id = f"{uid}:{key}"
+        self._attr_translation_key = key
+        self._attr_icon = icon
+        self._attr_device_info = _device(site, uid)
+
+    def _list(self) -> list[dict[str, Any]] | None:
+        v = (self.coordinator.data or {}).get(self._key)
+        return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else None
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._list() is not None
+
+    @property
+    def native_value(self) -> int | None:
+        items = self._list()
+        return None if items is None else sum(1 for x in items if self._active(x))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        items = self._list() or []
+        return {self._key: items, "total": len(items), "g7": self._key, "site": self._site}

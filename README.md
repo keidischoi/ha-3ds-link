@@ -124,6 +124,19 @@ Needs the site's IoT link plugin **1.19.0+**. Every 5 minutes the integration re
 
 Use them in automations — e.g. notify your phone when *Bids on my requests* goes up, or when a box's `over` becomes true. No personal data (names, addresses, phone numbers) is sent. If several entries use the same link code, only one set of sensors is made. New storage boxes appear after reloading the integration.
 
+## Dashboard cards and sidebar panel (0.6.0+)
+
+After the restart **3DSSync** appears in the sidebar (printers, filament stock, storage boxes, connected sensors), and four cards are in the dashboard card picker — no extra download:
+
+| Card | Shows |
+|---|---|
+| `custom:g7-3dssync-card` | everything (`show: [summary, printers, stock, boxes, sensors]` to pick parts) |
+| `custom:g7-3dssync-printer-card` | printers with progress, time left, nozzle / bed temperature |
+| `custom:g7-3dssync-stock-card` | every spool drawn in its colour with what is left |
+| `custom:g7-3dssync-sensors-card` | storage boxes (humidity, temperature) and which sensors are talking to the site |
+
+Needs the site's IoT link plugin **1.19.9+** for printers, spools and the sensor list. Two more sensors come with it: *Printing now* and *Sensors online*.
+
 ## Printer integrations
 
 Any printer integration works — this integration only **reads the sensors that integration creates and sends them**.
