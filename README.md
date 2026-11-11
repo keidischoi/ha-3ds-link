@@ -4,7 +4,7 @@
 
 > Formerly named **3ds**. Same integration (domain `g7_link`) — existing setups keep working.
 
-Sends Home Assistant temperature / humidity sensors, printer / device state and camera snapshots to a **G7 (Gnuboard 7)** site running the **📡 IoT Link** plugin.
+Sends Home Assistant temperature / humidity sensors, printer / device state and camera snapshots to a **G7 (Gnuboard 7)** site running the **📡 IoT Link** plugin — and brings notices, orders, bids, filament stock, storage boxes and connected sensors back as sensors, dashboard cards and a sidebar panel. See the [changelog](CHANGELOG.md).
 No YAML — you just pick sensors in the UI.
 
 ## ⚠️ Requirements — read this first
@@ -112,44 +112,58 @@ Choose **⚡ Find and connect automatically** at the top: Home Assistant devices
 To attach more printers / equipment, start again from step 3 (address and code are pre-filled).
 To change sensors or alert thresholds, press **Configure** on the integration. Deleting the integration also deletes its devices on the site.
 
-## Site → Home Assistant sensors (0.5.0+)
+## Site → Home Assistant (0.5.0+)
 
-Needs the site's IoT link plugin **1.19.0+**. Every 5 minutes the integration reads your account's status from the site and shows it as sensors on a **3DSSync — <site>** device:
+Every 5 minutes the integration reads your account's status from the site (IoT link plugin **1.19.12+** for everything below). No personal data (names, addresses, phone numbers) is sent. If several entries use the same link code, only one set of sensors is made.
 
-- Unread notices (attributes: last notice, time)
-- Orders in progress
-- Bids on my requests · My pending bids · Open print requests
-- Filament rolls · Filament running low (attribute: low_list) · Filament used up
-- One sensor per storage box: rolls inside (attributes: low, humidity, temp, humidity_max, over)
+### Personal and company data
 
-Use them in automations — e.g. notify your phone when *Bids on my requests* goes up, or when a box's `over` becomes true. No personal data (names, addresses, phone numbers) is sent. If several entries use the same link code, only one set of sensors is made. New storage boxes appear after reloading the integration.
+When you connect, pick what to bring in: **👤 personal** and/or each **🏢 company** you belong to. Change it later under Configure → *Personal / company data*.
 
-## Personal and company data (0.7.0+)
+Every choice is its own device — **3DSSync 👤 Personal** / **3DSSync 🏢 <company>** — under **3DSSync — <site>**. The device page splits it into Home Assistant's own boxes:
 
-When you connect, pick what to bring in: **👤 personal** and/or each **🏢 company** you belong to (IoT link 1.19.12+). Change it later under Configure → *Personal / company data*.
+| Box | What is in it |
+|---|---|
+| Controls | 🔄 Refresh now (reads the site right away) |
+| Sensors | 🔔 Unread notices · 🛒 Orders in progress · 🔨 Bids on my requests · My pending bids · Open print requests · Requests recommended to the company · 🧵 Filament rolls · running low · used up · 📦 one sensor per storage box · 🖨️ Printing now |
+| Diagnostic | 📡 Sensors online · 📡 each connected sensor (online / offline / never) |
 
-Every choice gets its own **3DSSync 👤 Personal / 🏢 <company>** device under **3DSSync — <site>**. On its page: *Controls* = 🔄 Refresh now · *Sensors* = 🔔 🛒 🔨 🧵 📦 🖨️ (an emoji per category keeps them together) · *Diagnostic* = 📡 each connected sensor (online / offline). Categories:
+- Notices, orders and printers are personal only.
+- Requests and bids: personal = your requests and the bids you placed yourself · company = bids placed as the company and requests recommended to it.
+- Storage box sensor: state = rolls inside; attributes `low`, `humidity`, `temp`, `humidity_max`, `over`.
 
-- Notices · orders (personal only)
-- Requests · bids (personal: your requests and your own bids · company: bids placed as the company, requests recommended to it)
-- Filament stock · Storage boxes · Connected sensors · Printers (personal)
+Use them in automations — e.g. notify your phone when *Bids on my requests* goes up, or when a box's `over` becomes true. New storage boxes appear after the next refresh.
 
-Cards: pick the server and scope in the card editor (*Automatic* = the one with the most data). The sidebar panel has a tab per server and scope.
+### Dashboard cards and sidebar panel
 
-## Dashboard cards and sidebar panel (0.6.0+)
-
-After the restart **3DSSync** appears in the sidebar (printers, filament stock, storage boxes, connected sensors), and four cards are in the dashboard card picker — no extra download:
+After the restart **3DSSync** appears in the sidebar (a tab per server and personal / company), and four cards are in the dashboard card picker — no extra download:
 
 | Card | Shows |
 |---|---|
-| `custom:g7-3dssync-card` | everything (`show: [summary, printers, stock, boxes, sensors]` to pick parts) |
+| `custom:g7-3dssync-card` | everything: summary, printers, filament stock, storage boxes, connected sensors |
 | `custom:g7-3dssync-printer-card` | printers with progress, time left, nozzle / bed temperature |
 | `custom:g7-3dssync-stock-card` | every spool drawn in its colour with what is left |
-| `custom:g7-3dssync-sensors-card` | storage boxes (humidity, temperature) and which sensors are talking to the site |
+| `custom:g7-3dssync-sensors-card` | storage boxes and which sensors are talking to the site |
 
-Storage boxes are drawn with their rolls on the left and the box sensor (humidity, temperature) on one line at the top, and the box name picks the picture: a name with *dry* / *건조* / *드라이* draws a filament dryer, *shelf* / *rack* / *선반* / *랙* an open shelf, anything else a clear storage bin. Rolls in no box get their own tile. `spools: separate` (also in the card editor) shows only the numbers, big, and keeps every roll in the stock list. `box_look: list` shows the earlier text tiles.
+Card options (all can be set in the card editor too):
 
-Needs the site's IoT link plugin **1.19.9+** for printers, spools and the sensor list. Two more sensors come with it: *Printing now* and *Sensors online*. From 0.6.1 every sensor connected to the site is also its own entity on the 3DSSync device (state online / offline / never · temperature, humidity, where it is attached in the attributes; IoT link 1.19.10+).
+| Option | Values | Default |
+|---|---|---|
+| `site` | a server · scope label such as `3dsueno.com · 👤 Personal` | the one with the most data |
+| `show` | any of `summary`, `printers`, `stock`, `boxes`, `sensors` | the card's own parts |
+| `box_look` | `list` — the earlier text tiles with a big humidity number | pictures |
+| `spools` | `separate` — box pictures show only the numbers, big; every roll stays in the stock list | rolls drawn inside the boxes |
+| `hide_where` | `true` — hide the 📍 server · scope line | shown when you have more than one |
+
+**Storage box pictures.** The box sensor's humidity and temperature are on one line at the top (green under 50 %, orange from 50 %, red and blinking over the box's limit, 📡 *No sensor* when none is attached), and the rolls stand below in their real colours, filled by what is left. The box name picks the picture:
+
+| Box name contains | Picture | Rolls drawn |
+|---|---|---|
+| *dry* · *건조* · *드라이* | filament dryer | 4 |
+| *shelf* · *rack* · *선반* · *랙* · *진열* | open shelf | 4 |
+| anything else | clear storage bin | 5 |
+
+More rolls than that show as **+N**; the line under the picture always has the full count. Rolls that are in no box get their own **🧵 Not in a box** tile, and with the default `spools` setting the stock list in the same card lists only those. All pictures are translucent, so they fit light and dark themes.
 
 ## Printer integrations
 
