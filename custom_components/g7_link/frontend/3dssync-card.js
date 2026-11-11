@@ -6,7 +6,7 @@
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.3";
+  const VER = "0.8.4";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
@@ -34,55 +34,110 @@
     return `<svg width="${size}" height="${size}" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="${r + 1}" fill="#8b9099"/><circle cx="17" cy="17" r="${r}" fill="#d9dce1"/>` +
       `<circle cx="17" cy="17" r="${fill}" fill="${esc(hex)}" stroke="rgba(0,0,0,.18)" stroke-width=".6"/><circle cx="17" cy="17" r="4.4" fill="#5b616b"/><circle cx="17" cy="17" r="1.8" fill="#e8eaee"/></svg>`;
   };
-  // 0.8.3 storage box picture: a 3D clear dry box — spools inside as cylinders (real colour, fill = what is left), lid with clips,
-  // a digital hygrometer screen on the front (humidity · temperature; glows red when over the limit)
+  // 0.8.4 storage box pictures — the box name picks the look:
+  //   건조 · dry · 드라이 (dryer)  → a filament dryer: white body, handle, dark window with the rolls face-on, screen strip
+  //   선반 · 랙 · shelf · rack · 진열   → an open wall shelf: rolls standing face-on on a plank, a digital tag on the edge
+  //   anything else                    → a clear storage bin: rolls side-on, blue lid with clips, analogue hygrometer dial
+  // rolls: real colour, how full = what is left · humidity colour green < 50 · orange ≥ 50 · red (blinks) over the limit · grey no sensor
   let boxN = 0;
   const shade = (hex, k) => {   // lighten (k>0) / darken (k<0) a #rrggbb
     const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "")); if (!m) return hex;
     const n = parseInt(m[1], 16), c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(k > 0 ? v + (255 - v) * k : v * (1 + k)));
     return "#" + c.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
   };
-  const boxSvg = (spools, count, h, t, over) => {
-    const id = "g7b" + (++boxN), show = spools ? spools.slice(0, 4) : [], slots = spools === null ? 0 : Math.max(show.length, Math.min(count, 4), 1);
-    const X0 = 14, X1 = 150, gap = (X1 - X0) / Math.max(slots, 1), cy = 72;
-    const hc = h === null ? "#7c8591" : over ? "#ff5a5a" : h >= 50 ? "#ffb347" : "#59e39a";
+  const boxKind = (name) => {
+    const n = String(name || "").toLowerCase();
+    if (/건조|드라이|dry/.test(n)) return "dryer";
+    if (/선반|랙|진열|shelf|rack/.test(n)) return "shelf";
+    return "bin";
+  };
+  const humCol = (h, over) => h === null ? "#8a929c" : over ? "#ef4444" : h >= 50 ? "#f59e0b" : "#22c55e";
+  const pctOf = (p) => Math.max(0, Math.min(100, p.pct ?? 100));
+  const shadow = `<ellipse cx="110" cy="127" rx="100" ry="4" fill="rgba(0,0,0,.15)"/>`;
+  // a roll seen face-on (dryer window · shelf)
+  const faceRoll = (id, p, cx, cy, r, rim) => {
+    const col = esc(colorOf(p)), f = r * (0.52 + 0.46 * pctOf(p) / 100);
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${rim}"/><circle cx="${cx}" cy="${cy}" r="${f}" fill="${col}"/><circle cx="${cx}" cy="${cy}" r="${f}" fill="url(#${id}r)"/>
+      <circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#2b3038"/><circle cx="${cx}" cy="${cy}" r="${r * .14}" fill="#d7dce2"/>`;
+  };
+  const rollGrad = (id) => `<radialGradient id="${id}r" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#000" stop-opacity=".2"/></radialGradient>`;
+
+  const binSvg = (id, show, slots, count, h, t, hc) => {
+    const X0 = 16, X1 = 156, gap = (X1 - X0) / Math.max(slots, 1), w = Math.min(28, gap - 5);
     let rolls = "";
     for (let i = 0; i < slots; i++) {
-      const p = show[i], cx = X0 + gap * i + gap / 2, r = Math.min(22, gap / 2 - 3);
-      if (!p) {   // a roll without colour info
-        rolls += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(150,160,175,.55)" stroke-width="1.2" stroke-dasharray="3 3"/>`;
-        continue;
-      }
-      const col = colorOf(p), fill = r * (0.5 + 0.5 * Math.max(0, Math.min(100, p.pct ?? 100)) / 100);
-      rolls += `<g><circle cx="${cx + 4}" cy="${cy - 3}" r="${r}" fill="${esc(shade(col, -0.45))}"/>
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${id}f)" stroke="rgba(0,0,0,.25)" stroke-width=".6"/>
-        <circle cx="${cx}" cy="${cy}" r="${fill}" fill="${esc(col)}"/><circle cx="${cx}" cy="${cy}" r="${fill}" fill="url(#${id}w)"/>
-        <circle cx="${cx}" cy="${cy}" r="${r * 0.34}" fill="#3d434c"/><circle cx="${cx}" cy="${cy}" r="${r * 0.2}" fill="#c9ced6"/><circle cx="${cx}" cy="${cy}" r="${r * 0.1}" fill="#2a2f36"/></g>`;
+      const p = show[i], x = X0 + gap * i + (gap - w) / 2;
+      if (!p) { rolls += `<rect x="${x}" y="44" width="${w}" height="70" rx="4" fill="none" stroke="#b8c0ca" stroke-dasharray="3 3"/>`; continue; }
+      const col = esc(colorOf(p)), fh = 28 + 32 * pctOf(p) / 100, fy = 79 - fh / 2;
+      let lines = "";
+      for (let k = 1; k < 7; k++) lines += `<line x1="${x + 3}" x2="${x + w - 3}" y1="${fy + k * fh / 7}" y2="${fy + k * fh / 7}" stroke="${esc(shade(colorOf(p), -0.25))}" stroke-width=".7"/>`;
+      rolls += `<rect x="${x + 3}" y="${fy}" width="${w - 6}" height="${fh}" fill="${col}"/>${lines}<rect x="${x + 3}" y="${fy}" width="${w - 6}" height="${fh}" fill="url(#${id}c)"/>
+        <rect x="${x}" y="44" width="4" height="70" rx="2" fill="#3a4049"/><rect x="${x + w - 4}" y="44" width="4" height="70" rx="2" fill="#3a4049"/>`;
     }
-    const more = slots && count > slots ? `<text x="${X1 - 2}" y="104" font-size="10" font-weight="700" text-anchor="end" fill="rgba(120,130,145,.9)">+${count - slots}</text>` : "";
-    const label = slots ? "" : `<text x="91" y="80" font-size="22" font-weight="700" text-anchor="middle" fill="rgba(120,130,145,.55)">${count}</text>`;
-    const hv = h === null ? "--" : Math.round(h), tv = t === null ? "" : t.toFixed(1) + "°";
-    return `<svg viewBox="0 0 230 124" width="100%" aria-hidden="true" class="${over ? "over" : ""}">
-      <defs>
-        <linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".34"/><stop offset=".55" stop-color="#cfe6f5" stop-opacity=".10"/><stop offset="1" stop-color="#9ec4dd" stop-opacity=".22"/></linearGradient>
-        <linearGradient id="${id}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef3f7"/><stop offset="1" stop-color="#b8c4ce"/></linearGradient>
-        <linearGradient id="${id}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9fb0bd" stop-opacity=".55"/><stop offset="1" stop-color="#6f808d" stop-opacity=".55"/></linearGradient>
-        <radialGradient id="${id}f" cx=".35" cy=".35" r=".8"><stop offset="0" stop-color="#f4f5f7"/><stop offset="1" stop-color="#a9afb8"/></radialGradient>
-        <radialGradient id="${id}w" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></radialGradient>
-      </defs>
-      <ellipse cx="102" cy="117" rx="96" ry="6" fill="rgba(0,0,0,.18)"/>
-      <path d="M8 34 L30 18 L196 18 L174 34 Z" fill="url(#${id}t)" stroke="rgba(0,0,0,.18)"/>
-      <path d="M174 34 L196 18 L196 96 L174 112 Z" fill="url(#${id}s)" stroke="rgba(0,0,0,.15)"/>
-      <rect x="8" y="34" width="166" height="78" rx="5" fill="rgba(210,225,235,.18)" stroke="rgba(0,0,0,.18)"/>
-      ${rolls}${more}${label}
-      <rect x="8" y="34" width="166" height="78" rx="5" fill="url(#${id}g)" stroke="rgba(255,255,255,.35)"/>
-      <path d="M16 40 L58 40 L22 104 L16 104 Z" fill="#fff" opacity=".12"/>
-      <rect x="8" y="30" width="166" height="7" rx="3" fill="#c3ccd4" stroke="rgba(0,0,0,.15)"/>
-      <rect x="40" y="31" width="16" height="10" rx="2" fill="#8d99a4"/><rect x="126" y="31" width="16" height="10" rx="2" fill="#8d99a4"/>
-      <g class="lcd"><rect x="178" y="44" width="48" height="42" rx="6" fill="#151a20" stroke="${hc}" stroke-opacity=".55"/>
-        <path d="M202 48 c-2.4 3 -3.6 4.6 -3.6 6 a3.6 3.6 0 0 0 7.2 0 c0 -1.4 -1.2 -3 -3.6 -6z" fill="${hc}" opacity=".8"/>
-        <text x="202" y="72" font-size="16" font-weight="700" text-anchor="middle" fill="${hc}" font-family="ui-monospace,Menlo,Consolas,monospace">${hv}<tspan font-size="9">%</tspan></text>
-        <text x="202" y="82" font-size="8.5" text-anchor="middle" fill="${hc}" fill-opacity=".75" font-family="ui-monospace,Menlo,Consolas,monospace">${tv}</text></g></svg>`;
+    const more = slots && count > slots ? `<text x="154" y="120" font-size="10" font-weight="700" text-anchor="end" fill="#6b7480">+${count - slots}</text>` : "";
+    const label = slots ? "" : `<text x="86" y="90" font-size="26" font-weight="700" text-anchor="middle" fill="#8a929c">${count}</text>`;
+    const rad = (h === null ? -120 : -120 + 240 * Math.min(100, Math.max(0, h)) / 100) * Math.PI / 180;
+    const arc = (a) => `${186 + 16 * Math.sin(a)} ${80 - 16 * Math.cos(a)}`;
+    const body = "M10 34 L210 34 L204 120 Q203 124 199 124 L21 124 Q17 124 16 120 Z";
+    return `<defs>
+      <linearGradient id="${id}c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".25"/><stop offset=".35" stop-color="#fff" stop-opacity=".3"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></linearGradient>
+      <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e8f3fb" stop-opacity=".55"/><stop offset=".5" stop-color="#e8f3fb" stop-opacity=".15"/><stop offset="1" stop-color="#e8f3fb" stop-opacity=".45"/></linearGradient></defs>
+      ${shadow}<path d="${body}" fill="#eef3f7" stroke="#b9c3cc"/>${rolls}${label}<path d="${body}" fill="url(#${id}g)" stroke="#b9c3cc"/>
+      <rect x="4" y="22" width="212" height="14" rx="5" fill="#5b8def"/><rect x="4" y="32" width="212" height="4" fill="#3f6fd1"/>
+      <rect x="30" y="30" width="20" height="16" rx="3" fill="#3f6fd1"/><rect x="170" y="30" width="20" height="16" rx="3" fill="#3f6fd1"/>${more}
+      <g class="lcd"><circle cx="186" cy="80" r="22" fill="#fff" stroke="${hc}" stroke-width="3"/>
+        <path d="M${arc(-2.094)} A16 16 0 1 1 ${arc(2.094)}" fill="none" stroke="#e3e7ec" stroke-width="3"/>
+        <line x1="186" y1="80" x2="${186 + 15 * Math.sin(rad)}" y2="${80 - 15 * Math.cos(rad)}" stroke="#222" stroke-width="2" stroke-linecap="round"/><circle cx="186" cy="80" r="2.5" fill="#222"/>
+        <text x="186" y="96" font-size="8.5" font-weight="700" text-anchor="middle" fill="${hc}">${h === null ? "--" : Math.round(h)}%</text></g>
+      ${t === null ? "" : `<text x="186" y="115" font-size="8.5" text-anchor="middle" fill="#6b7480">${t.toFixed(1)}°C</text>`}`;
+  };
+
+  const dryerSvg = (id, show, slots, count, h, t, hc) => {
+    const X0 = 26, X1 = 194, gap = (X1 - X0) / Math.max(slots, 1), cy = 64, r = Math.min(24, gap / 2 - 3);
+    let rolls = "";
+    for (let i = 0; i < slots; i++) {
+      const p = show[i], cx = X0 + gap * i + gap / 2;
+      rolls += p ? faceRoll(id, p, cx, cy, r, "#2b3038") : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#6b7480" stroke-dasharray="3 3"/>`;
+    }
+    const label = slots ? "" : `<text x="110" y="74" font-size="26" font-weight="700" text-anchor="middle" fill="#cfd5dc">${count}</text>`;
+    return `<defs>${rollGrad(id)}
+      <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dfe4ea"/></linearGradient>
+      <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".4" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+      ${shadow}<path d="M78 16 v-6 a6 6 0 0 1 6 -6 h52 a6 6 0 0 1 6 6 v6" fill="none" stroke="#9aa3ad" stroke-width="5" stroke-linecap="round"/>
+      <rect x="8" y="14" width="204" height="110" rx="16" fill="url(#${id}b)" stroke="#c4cbd3"/>
+      <rect x="18" y="26" width="184" height="76" rx="10" fill="#1d2229"/>${rolls}${label}<rect x="18" y="26" width="184" height="76" rx="10" fill="url(#${id}g)"/>
+      ${slots && count > slots ? `<text x="196" y="97" font-size="10" font-weight="700" text-anchor="end" fill="#cfd5dc">+${count - slots}</text>` : ""}
+      <g class="lcd"><rect x="70" y="107" width="80" height="13" rx="4" fill="#111418"/>
+        <text x="110" y="117" font-size="9.5" font-weight="700" text-anchor="middle" fill="${hc}" font-family="ui-monospace,Consolas,monospace">💧${h === null ? "--" : Math.round(h)}%${t === null ? "" : "  " + t.toFixed(0) + "°C"}</text>
+        <circle cx="58" cy="113.5" r="2.5" fill="${hc}"/></g>
+      <circle cx="164" cy="113.5" r="3.5" fill="#c4cbd3"/><circle cx="176" cy="113.5" r="3.5" fill="#c4cbd3"/>`;
+  };
+
+  const shelfSvg = (id, show, slots, count, h, t, hc) => {
+    const X0 = 14, X1 = 206, gap = (X1 - X0) / Math.max(slots, 1), r = Math.min(30, gap / 2 - 3), cy = 98 - r;
+    let rolls = "";
+    for (let i = 0; i < slots; i++) {
+      const p = show[i], cx = X0 + gap * i + gap / 2;
+      rolls += p ? faceRoll(id, p, cx, cy, r, "#3a4049") : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#b8c0ca" stroke-dasharray="3 3"/>`;
+    }
+    const label = slots ? "" : `<text x="110" y="84" font-size="26" font-weight="700" text-anchor="middle" fill="#8a929c">${count}</text>`;
+    return `<defs>${rollGrad(id)}
+      <linearGradient id="${id}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9b48a"/><stop offset="1" stop-color="#a97a4e"/></linearGradient></defs>
+      <rect x="4" y="10" width="212" height="88" rx="4" fill="#f3f4f6" stroke="#e1e4e8"/>
+      <rect x="12" y="98" width="8" height="22" fill="#8b9099"/><rect x="200" y="98" width="8" height="22" fill="#8b9099"/>
+      <path d="M12 110 L28 98 L20 98 Z M208 110 L192 98 L200 98 Z" fill="#8b9099"/>
+      ${rolls}${label}
+      ${slots && count > slots ? `<text x="206" y="24" font-size="10" font-weight="700" text-anchor="end" fill="#6b7480">+${count - slots}</text>` : ""}
+      <rect x="2" y="98" width="216" height="10" rx="2" fill="url(#${id}w)"/><rect x="2" y="106" width="216" height="2" fill="rgba(0,0,0,.18)"/>
+      <g class="lcd"><rect x="80" y="110" width="60" height="16" rx="4" fill="#111418" stroke="${hc}" stroke-opacity=".6"/>
+        <text x="110" y="121.5" font-size="9.5" font-weight="700" text-anchor="middle" fill="${hc}" font-family="ui-monospace,Consolas,monospace">${h === null ? "--" : Math.round(h)}%${t === null ? "" : " " + t.toFixed(0) + "°"}</text></g>`;
+  };
+
+  const boxSvg = (name, spools, count, h, t, over) => {
+    const id = "g7b" + (++boxN), kind = boxKind(name), max = kind === "bin" ? 5 : 4;
+    const show = spools ? spools.slice(0, max) : [], slots = spools ? Math.max(show.length, Math.min(count, max), 1) : 0;
+    const draw = kind === "dryer" ? dryerSvg : kind === "shelf" ? shelfSvg : binSvg;
+    return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true" class="${over ? "over" : ""}">${draw(id, show, slots, count, h, t, humCol(h, over))}</svg>`;
   };
   const printerSvg = (busy) => `<svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true" class="${busy ? "busy" : ""}">
     <rect x="6" y="6" width="52" height="52" rx="7" fill="var(--g7-soft)" stroke="var(--g7-line)"/>
@@ -251,7 +306,7 @@
         const a = s.attributes, h = num(a.humidity), t = num(a.temp);
         const inside = this._sep() ? null : all.filter((p) => p.box && a.name && String(p.box).trim() === String(a.name).trim());
         return `<div class="bx ${a.over ? "over" : ""}" data-ent="${esc(s.entity_id)}" style="cursor:pointer"><div class="t">📦 ${esc(a.name || s.attributes.friendly_name)}</div>
-          <div class="art">${boxSvg(inside, this._val(s), h, t, !!a.over)}</div>
+          <div class="art">${boxSvg(a.name, inside, this._val(s), h, t, !!a.over)}</div>
           <div class="s">🧵 ${this._val(s)} ${esc(L.rolls)}${a.low ? ` (${esc(L.low)} ${a.low})` : ""}</div>${a.over ? `<div class="s warn">⚠ ${esc(L.over)}</div>` : ""}</div>`;
       }).join("");
       return `<div class="sec"><h3>📦 ${esc(L.boxes)} <b>${boxes.length}</b></h3><div class="boxes">${tiles}</div></div>`;
