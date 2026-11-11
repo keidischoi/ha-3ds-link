@@ -60,7 +60,7 @@ _NET_ERRORS = (aiohttp.ClientError, TimeoutError, OSError)
 CARD_URL = "/g7_link/3dssync-card.js"   # 0.6.0 cards (card picker: 3DSSync) + sidebar panel
 CARD_FILE = Path(__file__).parent / "frontend" / "3dssync-card.js"
 PANEL_PATH = "3dssync"
-PLATFORMS = [Platform.SENSOR]   # 0.5.0 사이트 → HA 센서 (알림 · 주문 · 의뢰 · 필라멘트 · 보관함)
+PLATFORMS = [Platform.SENSOR, Platform.BUTTON]   # 0.8.0 + 「지금 새로 고침」 button   # 0.5.0 사이트 → HA 센서 (알림 · 주문 · 의뢰 · 필라멘트 · 보관함)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

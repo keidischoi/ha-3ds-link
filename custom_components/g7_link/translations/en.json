@@ -148,37 +148,37 @@
   "entity": {
     "sensor": {
       "unread": {
-        "name": "Unread notices"
+        "name": "🔔 Unread notices"
       },
       "orders_active": {
-        "name": "Orders in progress"
+        "name": "🛒 Orders in progress"
       },
       "bids_waiting": {
-        "name": "Bids on my requests"
+        "name": "🔨 Bids on my requests"
       },
       "my_bids": {
-        "name": "My pending bids"
+        "name": "🔨 My pending bids"
       },
       "jobs_open": {
-        "name": "Open print requests"
+        "name": "🔨 Open print requests"
       },
       "filament_total": {
-        "name": "Filament rolls"
+        "name": "🧵 Filament rolls"
       },
       "filament_low": {
-        "name": "Filament running low"
+        "name": "🧵 Filament running low"
       },
       "filament_empty": {
-        "name": "Filament used up"
+        "name": "🧵 Filament used up"
       },
       "box": {
-        "name": "Box {name}"
+        "name": "📦 {name}"
       },
       "printers": {
-        "name": "Printing now"
+        "name": "🖨️ Printing now"
       },
       "devices": {
-        "name": "Sensors online"
+        "name": "📡 Sensors online"
       },
       "site_device": {
         "name": "Sensor",
@@ -189,7 +189,12 @@
         }
       },
       "recommended": {
-        "name": "Requests recommended to the company"
+        "name": "🔨 Requests recommended to the company"
+      }
+    },
+    "button": {
+      "refresh": {
+        "name": "🔄 Refresh now"
       }
     }
   }

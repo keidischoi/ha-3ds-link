@@ -128,7 +128,7 @@ Use them in automations — e.g. notify your phone when *Bids on my requests* go
 
 When you connect, pick what to bring in: **👤 personal** and/or each **🏢 company** you belong to (IoT link 1.19.12+). Change it later under Configure → *Personal / company data*.
 
-Every choice gets its own **3DSSync 👤 Personal / 🏢 <company>** device under **3DSSync — <site>**, and inside it one device (box) per category:
+Every choice gets its own **3DSSync 👤 Personal / 🏢 <company>** device under **3DSSync — <site>**. On its page: *Controls* = 🔄 Refresh now · *Sensors* = 🔔 🛒 🔨 🧵 📦 🖨️ (an emoji per category keeps them together) · *Diagnostic* = 📡 each connected sensor (online / offline). Categories:
 
 - Notices · orders (personal only)
 - Requests · bids (personal: your requests and your own bids · company: bids placed as the company, requests recommended to it)
