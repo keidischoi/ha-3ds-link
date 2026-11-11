@@ -7,7 +7,7 @@
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.7";
+  const VER = "0.8.8";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
@@ -86,12 +86,12 @@
         <rect x="${x}" y="44" width="4" height="70" rx="2" fill="#3a4049"/><rect x="${x + w - 4}" y="44" width="4" height="70" rx="2" fill="#3a4049"/>`;
     }
     const more = slots && count > slots ? `<text x="${X1}" y="121" font-size="10" font-weight="700" text-anchor="end" fill="#6b7480">+${count - slots}</text>` : "";
-    const nums = slots ? `<line x1="${SIDE}" y1="44" x2="${SIDE}" y2="116" stroke="#c9d2da" stroke-dasharray="2 3"/>${readout(178, 80, 102, h, t, hc, "#4b5563")}` : readout(110, 86, 112, h, t, hc, "#4b5563", true);
+    const nums = slots ? `<line x1="${SIDE}" y1="44" x2="${SIDE}" y2="116" stroke="#c9d2da" stroke-dasharray="2 3"/>${readout(178, 80, 102, h, t, hc, "var(--g7-text)")}` : readout(110, 86, 112, h, t, hc, "var(--g7-text)", true);
     const body = "M10 34 L210 34 L204 120 Q203 124 199 124 L21 124 Q17 124 16 120 Z";
     return `<defs>
       <linearGradient id="${id}c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".25"/><stop offset=".35" stop-color="#fff" stop-opacity=".3"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></linearGradient>
-      <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e8f3fb" stop-opacity=".55"/><stop offset=".5" stop-color="#e8f3fb" stop-opacity=".15"/><stop offset="1" stop-color="#e8f3fb" stop-opacity=".45"/></linearGradient></defs>
-      ${shadow}<path d="${body}" fill="#eef3f7" stroke="#b9c3cc"/>${rolls}<path d="${body}" fill="url(#${id}g)" stroke="#b9c3cc"/>${nums}
+      <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e8f3fb" stop-opacity=".3"/><stop offset=".5" stop-color="#e8f3fb" stop-opacity=".06"/><stop offset="1" stop-color="#e8f3fb" stop-opacity=".22"/></linearGradient></defs>
+      ${shadow}<path d="${body}" fill="rgba(214,228,240,.16)" stroke="rgba(150,165,180,.6)"/>${rolls}<path d="${body}" fill="url(#${id}g)" stroke="rgba(150,165,180,.6)"/>${nums}
       <rect x="4" y="22" width="212" height="14" rx="5" fill="#5b8def"/><rect x="4" y="32" width="212" height="4" fill="#3f6fd1"/>
       <rect x="30" y="30" width="20" height="16" rx="3" fill="#3f6fd1"/><rect x="170" y="30" width="20" height="16" rx="3" fill="#3f6fd1"/>${more}`;
   };
@@ -121,10 +121,10 @@
       const p = show[i], cx = X0 + gap * i + gap / 2;
       rolls += p ? faceRoll(id, p, cx, cy, r, "#3a4049") : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#b8c0ca" stroke-dasharray="3 3"/>`;
     }
-    const nums = slots ? readout(182, 64, 86, h, t, hc, "#4b5563") : readout(110, 56, 84, h, t, hc, "#4b5563", true);
+    const nums = slots ? readout(182, 64, 86, h, t, hc, "var(--g7-text)") : readout(110, 56, 84, h, t, hc, "var(--g7-text)", true);
     return `<defs>${rollGrad(id)}
       <linearGradient id="${id}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9b48a"/><stop offset="1" stop-color="#a97a4e"/></linearGradient></defs>
-      <rect x="4" y="10" width="212" height="88" rx="4" fill="#f3f4f6" stroke="#e1e4e8"/>
+      <rect x="4" y="10" width="212" height="88" rx="4" fill="rgba(200,206,214,.16)" stroke="rgba(150,160,170,.35)"/>
       <rect x="12" y="98" width="8" height="22" fill="#8b9099"/><rect x="200" y="98" width="8" height="22" fill="#8b9099"/>
       <path d="M12 110 L28 98 L20 98 Z M208 110 L192 98 L200 98 Z" fill="#8b9099"/>
       ${rolls}${nums}
