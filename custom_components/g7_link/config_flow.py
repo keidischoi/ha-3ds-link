@@ -37,6 +37,7 @@ from .const import (
     CONF_PUSH_URL,
     CONF_REMAINING,
     CONF_SENSORS,
+    CONF_SCOPES,
     CONF_SITE,
     CONF_SNAP_PUBLIC,
     CONF_STATE,
@@ -379,6 +380,16 @@ def _body(where: dict[str, Any], sensors: dict[str, Any]) -> dict[str, Any]:
     return body
 
 
+def _scope_options(hub: dict[str, Any]) -> dict[str, str]:
+    """0.7.0 site's scopes (IoT link 1.19.11+): {"me": "👤 개인", "c:3": "🏢 …"} — empty on older sites."""
+    return {str(s["key"]): str(s.get("name") or s["key"]) for s in (hub.get("scopes") or []) if isinstance(s, dict) and s.get("key")}
+
+
+def _scope_schema(opts: dict[str, str], default: list[str]) -> vol.Schema:
+    return vol.Schema({vol.Required(CONF_SCOPES, default=default): selector.SelectSelector(selector.SelectSelectorConfig(
+        options=[selector.SelectOptionDict(value=k, label=v) for k, v in opts.items()], multiple=True, mode=selector.SelectSelectorMode.LIST))})
+
+
 def _has_entity(sensors: dict[str, Any]) -> bool:
     return any(sensors.get(k) for k in (CONF_HUM, CONF_TEMP, CONF_STATE))
 
@@ -395,6 +406,7 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._where: dict[str, Any] = {}
         self._found: dict[str, str] = {}  # 고른 HA 기기에서 찾은 센서 (센서 고르기 칸에 미리 채움)
         self._cands: dict[str, dict[str, Any]] = {}  # ⚡ 알아서 찾은 것
+        self._scopes: list[str] | None = None  # 0.7.0 고른 범위 (개인 · 업체)
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         """① 사이트 주소 · 연결 코드."""
@@ -412,6 +424,8 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             else:
                 self._site, self._code = site, code
+                if len(_scope_options(self._hub)) > 1:
+                    return await self.async_step_scope()
                 return await self.async_step_target()
         prev = next(iter(self._async_current_entries()), None)
         seed = user_input or (prev.data if prev else {})
@@ -422,6 +436,17 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+    async def async_step_scope(self, user_input: dict[str, Any] | None = None):
+        """0.7.0 ①-2 개인 · 업체 — 사이트에서 가져올 센서 · 재고 · 입찰의 범위 (여럿 골라도 됨)."""
+        opts = _scope_options(self._hub)
+        if user_input is not None:
+            self._scopes = [s for s in (user_input.get(CONF_SCOPES) or []) if s in opts] or list(opts)
+            return await self.async_step_target()
+        return self.async_show_form(step_id="scope", data_schema=_scope_schema(opts, list(opts)))
+
+    def _with_scopes(self, data: dict[str, Any]) -> dict[str, Any]:
+        return {**data, CONF_SCOPES: self._scopes} if self._scopes is not None else data
 
     async def async_step_target(self, user_input: dict[str, Any] | None = None):
         """② 무엇에 붙일지."""
@@ -495,7 +520,7 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "snap_max": self._hub.get("snap_max"),
                     "snapshot": bool(self._hub.get("snapshot", True)),
                 }
-                return self.async_create_entry(title=f"3DSSync — {len(devices)} devices", data=data, options={})
+                return self.async_create_entry(title=f"3DSSync — {len(devices)} devices", data=self._with_scopes(data), options={})
             errors.setdefault("base", "need_entity")
         schema = _items_schema({k: c["label"] for k, c in self._cands.items()}, [k for k, c in self._cands.items() if c["matched"]])
         return self.async_show_form(step_id="auto", data_schema=schema, errors=errors, description_placeholders=placeholders)
@@ -540,7 +565,7 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "gap_sec": self._hub.get("gap_sec"),
                     "snapshot": False,
                 }
-                return self.async_create_entry(title=f"3DSSync — {len(devices)} storage sensors", data=data, options={})
+                return self.async_create_entry(title=f"3DSSync — {len(devices)} storage sensors", data=self._with_scopes(data), options={})
             errors["base"] = last or "need_entity"
         return self.async_show_form(step_id="bulk", data_schema=_bulk_schema(), errors=errors, description_placeholders=placeholders)
 
@@ -630,7 +655,7 @@ class G7LinkConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         **self._where,
                     }
                     options = {k: v for k, v in user_input.items() if k != CONF_NAME}
-                    return self.async_create_entry(title=str(device.get("name") or "G7"), data=data, options=options)
+                    return self.async_create_entry(title=str(device.get("name") or "G7"), data=self._with_scopes(data), options=options)
             schema = self.add_suggested_values_to_schema(schema, user_input)
         elif self._found:
             schema = self.add_suggested_values_to_schema(schema, self._found)
@@ -648,6 +673,7 @@ class G7LinkOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, entry: config_entries.ConfigEntry) -> None:
         self._entry = entry
         self._cands: dict[str, dict[str, Any]] | None = None
+        self._hub: dict[str, Any] = {}
 
     async def async_step_auto(self, user_input: dict[str, Any] | None = None):
         """여러 대짜리 통합의 구성 — 지금 연결한 것(체크됨) + 새로 찾은 것. 체크를 빼면 사이트에서도 지움."""
@@ -697,6 +723,29 @@ class G7LinkOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(step_id="auto", data_schema=_items_schema(options, default), errors=errors, description_placeholders=placeholders)
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
+        """0.7.0 무엇을 바꿀지 — 🏢 개인 · 업체 범위 / 센서 (사이트가 범위를 모르면 바로 센서)."""
+        try:
+            self._hub = await _hub(self.hass, self._entry.data.get(CONF_SITE, ""), self._entry.data.get(CONF_CODE, ""))
+        except (InvalidCode, CannotConnect):
+            self._hub = {}
+        if len(_scope_options(self._hub)) > 1:
+            return self.async_show_menu(step_id="init", menu_options=["scope", "main"])
+        return await self.async_step_main(user_input)
+
+    async def async_step_scope(self, user_input: dict[str, Any] | None = None):
+        """0.7.0 범위 바꾸기 — 같은 사이트 · 같은 코드의 연결 모두 (센서는 그중 하나만 만듦)."""
+        opts = _scope_options(self._hub)
+        data = self._entry.data
+        if user_input is not None:
+            picked = [s for s in (user_input.get(CONF_SCOPES) or []) if s in opts] or list(opts)
+            for e in self.hass.config_entries.async_entries(DOMAIN):
+                if e.data.get(CONF_SITE) == data.get(CONF_SITE) and e.data.get(CONF_CODE) == data.get(CONF_CODE):
+                    self.hass.config_entries.async_update_entry(e, data={**e.data, CONF_SCOPES: picked})
+            return self.async_create_entry(title="", data=dict(self._entry.options))
+        current = [s for s in (data.get(CONF_SCOPES) or list(opts)) if s in opts]
+        return self.async_show_form(step_id="scope", data_schema=_scope_schema(opts, current))
+
+    async def async_step_main(self, user_input: dict[str, Any] | None = None):
         if self._entry.data.get(CONF_BULK):
             return await self.async_step_auto(user_input)
         entry = self._entry
@@ -723,7 +772,7 @@ class G7LinkOptionsFlow(config_entries.OptionsFlow):
                     return self.async_create_entry(title="", data={k: v for k, v in user_input.items() if k != CONF_NAME})
         current = user_input if user_input is not None else dict(entry.options)
         return self.async_show_form(
-            step_id="init",
+            step_id="main",
             data_schema=self.add_suggested_values_to_schema(schema, current),
             errors=errors,
             description_placeholders=placeholders,

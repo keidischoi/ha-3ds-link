@@ -23,7 +23,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator, UpdateFailed
 
-from .const import CONF_CODE, CONF_SITE, DOMAIN
+from .const import CONF_CODE, CONF_SCOPES, CONF_SITE, DOMAIN
 from .hub import hub_request
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,7 +40,13 @@ SENSORS: tuple[tuple[str, str, str, str, str, str | None, tuple[str, ...]], ...]
     ("filament_total", "filament", "total", "Filament rolls", "mdi:printer-3d-nozzle", "rolls", ("resin", "grams")),
     ("filament_low", "filament", "low", "Filament running low", "mdi:alert-circle-outline", "rolls", ("low_list",)),
     ("filament_empty", "filament", "empty", "Filament used up", "mdi:close-circle-outline", "rolls", ()),
+    ("recommended", "jobs", "recommended", "Requests recommended to the company", "mdi:star-circle-outline", None, ()),
 )
+
+# 0.7.0 each category is its own device (its own box on the device page) under the site device
+CATS = {"notices": ("Notices · orders", "알림 · 주문"), "orders": ("Notices · orders", "알림 · 주문"), "jobs": ("Requests · bids", "의뢰 · 입찰"),
+        "filament": ("Filament stock", "필라멘트 재고"), "boxes": ("Storage boxes", "보관함"), "devices": ("Connected sensors", "연결된 센서"), "printers": ("Printers", "프린터")}
+CAT_KEY = {"orders": "notices"}
 
 
 # 0.6.0 big lists for the cards — kept out of the recorder (history database)
@@ -50,13 +56,15 @@ BIG = frozenset({"spools", "printers", "devices", "low_list", "g7", "site"})
 class StatusCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Reads hub/{code}/status every 5 minutes."""
 
-    def __init__(self, hass: HomeAssistant, site: str, code: str) -> None:
-        super().__init__(hass, _LOGGER, name=f"3DSSync status {urlparse(site).netloc}", update_interval=SCAN)
-        self.site, self.code = site, code
+    def __init__(self, hass: HomeAssistant, site: str, code: str, scope: str = "all") -> None:
+        super().__init__(hass, _LOGGER, name=f"3DSSync status {urlparse(site).netloc} {scope}", update_interval=SCAN)
+        self.site, self.code, self.scope = site, code, scope
+        self.scopes: list[dict[str, str]] = []   # what the site offers (personal · each company) — filled by the first answer
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:
-            resp = await hub_request(async_get_clientsession(self.hass), "GET", self.site, f"{self.code}/status", hass=self.hass, timeout=_TIMEOUT)
+            rest = f"{self.code}/status" + ("" if self.scope == "all" else f"?scope={self.scope}")
+            resp = await hub_request(async_get_clientsession(self.hass), "GET", self.site, rest, hass=self.hass, timeout=_TIMEOUT)
             if resp.status != 200:
                 resp.release()
                 raise UpdateFailed(f"site answered {resp.status} (IoT link plugin 1.19.0+ needed)")
@@ -65,12 +73,32 @@ class StatusCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise UpdateFailed(str(err)) from err
         if not isinstance(data, dict) or not data.get("ok") or not isinstance(data.get("status"), dict):
             raise UpdateFailed("no status from the site")
+        if isinstance(data.get("scopes"), list):
+            self.scopes = [s for s in data["scopes"] if isinstance(s, dict) and s.get("key")]
         return data["status"]
 
 
 def _device(site: str, uid: str) -> dict[str, Any]:
     host = urlparse(site).netloc or site
     return {"identifiers": {(DOMAIN, f"status:{uid}")}, "name": f"3DSSync — {host}", "manufacturer": "3DS", "model": "Site status", "configuration_url": site}
+
+
+class Ctx:
+    """0.7.0 one scope of one site: where its sensors go (a device per category) and how they are named."""
+
+    def __init__(self, hass: HomeAssistant, site: str, uid: str, scope: str, scope_name: str) -> None:
+        self.site, self.uid, self.scope, self.scope_name = site, uid, scope, scope_name
+        self.host = urlparse(site).netloc or site
+        self.ko = str(getattr(hass.config, "language", "") or "").startswith("ko")
+        self.base = uid if scope == "all" else f"{uid}|{scope}"   # unique id start
+        self.label = f"{self.host} · {scope_name}" if scope_name else self.host   # the card groups by this
+
+    def device(self, cat: str) -> dict[str, Any]:
+        cat = CAT_KEY.get(cat, cat)
+        en, ko = CATS.get(cat, (cat, cat))
+        name = ko if self.ko else en
+        return {"identifiers": {(DOMAIN, f"status:{self.base}:{cat}")}, "name": f"{self.scope_name} {name}".strip(),
+                "manufacturer": "3DS", "model": "3DSSync", "via_device": (DOMAIN, f"status:{self.uid}"), "configuration_url": self.site}
 
 
 OWNERS = "_status_owners"   # hass.data[DOMAIN][OWNERS] = {(site, code): entry_id}
@@ -91,16 +119,59 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     owners = hass.data.setdefault(DOMAIN, {}).setdefault(OWNERS, {})
     if owners.setdefault((site, code), entry.entry_id) != entry.entry_id:
         return
-    coord = StatusCoordinator(hass, site, code)
-    await coord.async_refresh()   # failure → sensors unavailable, keeps retrying
     host = urlparse(site).netloc or site
     uid = host + ":" + hashlib.sha1(code.encode()).hexdigest()[:10]   # two accounts on one site stay apart · the code itself is not shown
-    ents: list[SensorEntity] = [StatusSensor(coord, uid, site, *s) for s in SENSORS]
-    ents.append(ListSensor(coord, uid, site, "printers", "mdi:printer-3d", lambda p: p.get("state") in ("printing", "paused")))   # 0.6.0 state = printing now
-    ents.append(ListSensor(coord, uid, site, "devices", "mdi:access-point-network", lambda d: bool(d.get("live"))))           # 0.6.0 state = sensors talking to the site
+    probe = StatusCoordinator(hass, site, code)
+    await probe.async_refresh()   # failure → sensors unavailable, keeps retrying
+    # the site device (parent of the category devices)
+    from homeassistant.helpers import device_registry as dr
+
+    dr.async_get(hass).async_get_or_create(config_entry_id=entry.entry_id, **_device(site, uid))
+    names = {s["key"]: str(s.get("name") or s["key"]) for s in probe.scopes}
+    saved = [s for s in (conf.get(CONF_SCOPES) or []) if isinstance(s, str)]
+    if names:
+        chosen = [s for s in (saved or list(names)) if s in names] or list(names)
+    elif saved and not probe.last_update_success:   # site not reachable now → the saved choice (names come back on the next start)
+        chosen = saved
+        names = {s: ("👤" if s == "me" else "🏢 #" + s[2:]) for s in saved}
+    else:
+        chosen = ["all"]   # old site without scopes → everything as before
+    keep: list[str] = []
+    for scope in chosen:
+        coord = probe if scope == "all" else StatusCoordinator(hass, site, code, scope)
+        if coord is not probe:
+            await coord.async_refresh()
+        ctx = Ctx(hass, site, uid, scope, names.get(scope, ""))
+        keep.append(ctx.base + "|")
+        _setup_scope(hass, entry, coord, ctx, async_add_entities)
+    if probe.last_update_success:
+        _cleanup(hass, entry, uid, keep)
+
+
+def _cleanup(hass: HomeAssistant, entry: ConfigEntry, uid: str, keep: list[str]) -> None:
+    """0.7.0 remove sensors of scopes no longer picked, and the 0.5/0.6 ones (one device, no scope)."""
+    from homeassistant.helpers import entity_registry as er
+
+    reg = er.async_get(hass)
+    for ent in er.async_entries_for_config_entry(reg, entry.entry_id):
+        if ent.domain == "sensor" and ent.platform == DOMAIN and ent.unique_id.startswith(uid) and not any(ent.unique_id.startswith(k) for k in keep):
+            reg.async_remove(ent.entity_id)
+
+
+def _setup_scope(hass: HomeAssistant, entry: ConfigEntry, coord: "StatusCoordinator", ctx: Ctx, async_add_entities: AddEntitiesCallback) -> None:
+    data = coord.data or {}
+    ents: list[SensorEntity] = []
+    for s in SENSORS:   # only what the site sends for this scope (a company has no notices · orders)
+        part = data.get(s[1])
+        if isinstance(part, dict) and s[2] in part:
+            ents.append(StatusSensor(coord, ctx, *s))
+    if isinstance(data.get("printers"), list):
+        ents.append(ListSensor(coord, ctx, "printers", "mdi:printer-3d", lambda p: p.get("state") in ("printing", "paused")))   # state = printing now
+    if isinstance(data.get("devices"), list):
+        ents.append(ListSensor(coord, ctx, "devices", "mdi:access-point-network", lambda d: bool(d.get("live"))))           # state = sensors talking to the site
     async_add_entities(ents)
 
-    # 0.6.1 one entity per storage box and per connected sensor on the site — new ones appear by themselves
+    # one entity per storage box and per connected sensor on the site — new ones appear by themselves
     known: set[str] = set()
 
     @callback
@@ -110,11 +181,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         for box in data.get("boxes") or []:
             if isinstance(box, dict) and box.get("key") and f"b:{box['key']}" not in known:
                 known.add(f"b:{box['key']}")
-                new.append(BoxSensor(coord, uid, site, str(box["key"]), str(box.get("name") or box["key"])))
+                new.append(BoxSensor(coord, ctx, str(box["key"]), str(box.get("name") or box["key"])))
         for dev in data.get("devices") or []:
             if isinstance(dev, dict) and dev.get("id") and f"d:{dev['id']}" not in known:
                 known.add(f"d:{dev['id']}")
-                new.append(SiteDeviceSensor(coord, uid, site, int(dev["id"]), str(dev.get("name") or dev["id"])))
+                new.append(SiteDeviceSensor(coord, ctx, int(dev["id"]), str(dev.get("name") or dev["id"])))
         if new:
             async_add_entities(new)
 
@@ -122,20 +193,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     entry.async_on_unload(coord.async_add_listener(_add_new))
 
 
+
 class StatusSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
     _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
     _unrecorded_attributes = BIG
 
-    def __init__(self, coord: StatusCoordinator, uid: str, site: str, key: str, section: str, field: str, name: str, icon: str, unit: str | None, attrs: tuple[str, ...]) -> None:
+    def __init__(self, coord: StatusCoordinator, ctx: Ctx, key: str, section: str, field: str, name: str, icon: str, unit: str | None, attrs: tuple[str, ...]) -> None:
         super().__init__(coord)
         self._section, self._field, self._attrs = section, field, attrs
-        self._key, self._site = key, uid.split(":")[0]
-        self._attr_unique_id = f"{uid}:{key}"
+        self._key, self._site = key, ctx.label
+        self._attr_unique_id = f"{ctx.base}|{key}"
         self._attr_translation_key = key   # Korean / English names from translations/*.json (entity.sensor.<key>)
         self._attr_icon = icon
         self._attr_native_unit_of_measurement = unit
-        self._attr_device_info = _device(site, uid)
+        self._attr_device_info = ctx.device(section)
 
     def _part(self) -> dict[str, Any] | None:
         part = (self.coordinator.data or {}).get(self._section)
@@ -169,13 +241,13 @@ class BoxSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
     _attr_native_unit_of_measurement = "rolls"
     _unrecorded_attributes = BIG
 
-    def __init__(self, coord: StatusCoordinator, uid: str, site: str, key: str, name: str) -> None:
+    def __init__(self, coord: StatusCoordinator, ctx: Ctx, key: str, name: str) -> None:
         super().__init__(coord)
-        self._key, self._site = key, uid.split(":")[0]
-        self._attr_unique_id = f"{uid}:box:{hashlib.sha1(key.encode()).hexdigest()[:10]}"
+        self._key, self._site = key, ctx.label
+        self._attr_unique_id = f"{ctx.base}|box|{hashlib.sha1(key.encode()).hexdigest()[:10]}"
         self._attr_translation_key = "box"
         self._attr_translation_placeholders = {"name": name}
-        self._attr_device_info = _device(site, uid)
+        self._attr_device_info = ctx.device("boxes")
 
     def _box(self) -> dict[str, Any] | None:
         for b in (self.coordinator.data or {}).get("boxes") or []:
@@ -210,13 +282,13 @@ class ListSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _unrecorded_attributes = BIG
 
-    def __init__(self, coord: StatusCoordinator, uid: str, site: str, key: str, icon: str, active: Any) -> None:
+    def __init__(self, coord: StatusCoordinator, ctx: Ctx, key: str, icon: str, active: Any) -> None:
         super().__init__(coord)
-        self._key, self._site, self._active = key, uid.split(":")[0], active
-        self._attr_unique_id = f"{uid}:{key}"
+        self._key, self._site, self._active = key, ctx.label, active
+        self._attr_unique_id = f"{ctx.base}|{key}"
         self._attr_translation_key = key
         self._attr_icon = icon
-        self._attr_device_info = _device(site, uid)
+        self._attr_device_info = ctx.device(key)
 
     def _list(self) -> list[dict[str, Any]] | None:
         v = (self.coordinator.data or {}).get(self._key)
@@ -249,12 +321,12 @@ class SiteDeviceSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
     _attr_translation_key = "site_device"
     _unrecorded_attributes = BIG
 
-    def __init__(self, coord: StatusCoordinator, uid: str, site: str, dev_id: int, name: str) -> None:
+    def __init__(self, coord: StatusCoordinator, ctx: Ctx, dev_id: int, name: str) -> None:
         super().__init__(coord)
-        self._id, self._site = dev_id, uid.split(":")[0]
-        self._attr_unique_id = f"{uid}:dev:{dev_id}"
+        self._id, self._site = dev_id, ctx.label
+        self._attr_unique_id = f"{ctx.base}|dev|{dev_id}"
         self._attr_name = name
-        self._attr_device_info = _device(site, uid)
+        self._attr_device_info = ctx.device("devices")
 
     def _dev(self) -> dict[str, Any] | None:
         for d in (self.coordinator.data or {}).get("devices") or []:
