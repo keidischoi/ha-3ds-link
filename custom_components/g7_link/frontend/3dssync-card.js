@@ -7,16 +7,16 @@
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.10";
+  const VER = "0.8.11";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
       unread: "알림", orders: "주문", bids: "입찰", low: "조금 남음", live: "통신 중", lost: "끊김", never: "안 옴", none: "아직 없어요",
-      over: "습도 높음", nodata: "3DSSync 센서를 찾지 못했어요 — 통합을 먼저 연결하세요.", ago_m: "분 전", ago_h: "시간 전", ago_d: "일 전", now: "방금", min: "분", h: "시간", company: "업체", inbox: "보관함에 든 {n}롤은 아래 보관함 그림에", outside: "보관함 밖", nosensor: "센서 없음" },
+      over: "습도 높음", nodata: "3DSSync 센서를 찾지 못했어요 — 통합을 먼저 연결하세요.", ago_m: "분 전", ago_h: "시간 전", ago_d: "일 전", now: "방금", min: "분", h: "시간", company: "업체", inbox: "보관함에 든 {n}롤은 아래 보관함 그림에", outside: "보관함 밖", nosensor: "센서 없음", resin: "레진", bottles: "병" },
     en: { printers: "Printers", stock: "Filament stock", boxes: "Storage boxes", sensors: "Connected sensors", rolls: "rolls", all: "Show all", less: "Show less",
       idle: "Idle", printing: "Printing", paused: "Paused", done: "Done", failed: "Failed", offline: "Off", left: "left", nozzle: "Nozzle", bed: "Bed",
       unread: "Notices", orders: "Orders", bids: "Bids", low: "Low", live: "Live", lost: "Lost", never: "Never", none: "Nothing yet",
-      over: "Too humid", nodata: "No 3DSSync sensors found — set up the integration first.", ago_m: "min ago", ago_h: "h ago", ago_d: "d ago", now: "just now", min: "min", h: "h", company: "Company", inbox: "{n} rolls in storage boxes are drawn in the boxes below", outside: "Not in a box", nosensor: "No sensor" },
+      over: "Too humid", nodata: "No 3DSSync sensors found — set up the integration first.", ago_m: "min ago", ago_h: "h ago", ago_d: "d ago", now: "just now", min: "min", h: "h", company: "Company", inbox: "{n} rolls in storage boxes are drawn in the boxes below", outside: "Not in a box", nosensor: "No sensor", resin: "resin", bottles: " bottles" },
   };
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const num = (v) => (typeof v === "number" && isFinite(v) ? v : null);
@@ -61,6 +61,17 @@
     return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${rim}"/><circle cx="${cx}" cy="${cy}" r="${f}" fill="${col}"/><circle cx="${cx}" cy="${cy}" r="${f}" fill="url(#${id}r)"/>
       <circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#2b3038"/><circle cx="${cx}" cy="${cy}" r="${r * .14}" fill="#d7dce2"/>`;
   };
+  // 0.8.11 🧪 resin is drawn as a bottle: dark cap, amber body, the resin's colour filled by what is left, a label band
+  const isResin = (p) => p && p.kind === "resin";
+  const bottle = (x, bot, w, ht, p) => {
+    const col = esc(colorOf(p)), capH = ht * 0.16, by = bot - ht + capH, bh = ht - capH, lv = (bh - 3) * (0.1 + 0.9 * pctOf(p) / 100);
+    return `<rect x="${x + w * 0.28}" y="${bot - ht}" width="${w * 0.44}" height="${capH + 2}" rx="2" fill="#2b3038"/>
+      <rect x="${x}" y="${by}" width="${w}" height="${bh}" rx="${w * 0.18}" fill="rgba(214,150,60,.28)" stroke="rgba(150,100,40,.75)"/>
+      <rect x="${x + 1.5}" y="${bot - 1.5 - lv}" width="${w - 3}" height="${lv}" rx="${w * 0.14}" fill="${col}" opacity=".85"/>
+      <rect x="${x}" y="${by + bh * 0.34}" width="${w}" height="${bh * 0.2}" fill="rgba(255,255,255,.6)"/>`;
+  };
+  const bottleSvg = (p, size = 34) => `<svg width="${size}" height="${size}" viewBox="0 0 34 34" aria-hidden="true">${bottle(9, 32, 16, 30, p)}</svg>`;
+  const itemSvg = (p, size) => isResin(p) ? bottleSvg(p, size) : spoolSvg(colorOf(p), p.pct, size);
   const rollGrad = (id) => `<radialGradient id="${id}r" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#000" stop-opacity=".2"/></radialGradient>`;
 
   // 0.8.10 the box's sensor on one line at the top (💧 humidity · 🌡 temperature, side by side), rolls across the full width below;
@@ -72,12 +83,13 @@
       <tspan fill="${hc}">💧${h === null ? "--" : Math.round(h)}<tspan font-size="${size * 0.7}">%</tspan></tspan><tspan dx="${size * 0.6}" fill="${tc}">🌡${t === null ? "--" : t.toFixed(1)}<tspan font-size="${size * 0.7}">°C</tspan></tspan></text>`;
   };
 
-  const binSvg = (id, show, slots, count, h, t, hc) => {
+  const binSvg = (id, show, slots, count, h, t, hc, big) => {
     const X0 = 18, X1 = 202, gap = (X1 - X0) / Math.max(slots, 1), w = Math.min(30, gap - 6), top = 60, ht = 56, mid = top + ht / 2;
     let rolls = "";
     for (let i = 0; i < slots; i++) {
       const p = show[i], x = X0 + gap * i + (gap - w) / 2;
       if (!p) { rolls += `<rect x="${x}" y="${top}" width="${w}" height="${ht}" rx="4" fill="none" stroke="#b8c0ca" stroke-dasharray="3 3"/>`; continue; }
+      if (isResin(p)) { rolls += bottle(x, top + ht, w, ht, p); continue; }
       const col = esc(colorOf(p)), fh = 22 + 26 * pctOf(p) / 100, fy = mid - fh / 2;
       let lines = "";
       for (let k = 1; k < 6; k++) lines += `<line x1="${x + 3}" x2="${x + w - 3}" y1="${fy + k * fh / 6}" y2="${fy + k * fh / 6}" stroke="${esc(shade(colorOf(p), -0.25))}" stroke-width=".7"/>`;
@@ -85,7 +97,7 @@
         <rect x="${x}" y="${top}" width="4" height="${ht}" rx="2" fill="#3a4049"/><rect x="${x + w - 4}" y="${top}" width="4" height="${ht}" rx="2" fill="#3a4049"/>`;
     }
     const more = slots && count > slots ? `<text x="200" y="121" font-size="10" font-weight="700" text-anchor="end" fill="var(--g7-dim)">+${count - slots}</text>` : "";
-    const nums = slots ? readout(110, 53, h, t, hc, "var(--g7-text)") : readout(110, 86, h, t, hc, "var(--g7-text)", 22);
+    const nums = !big ? readout(110, 53, h, t, hc, "var(--g7-text)") : readout(110, 86, h, t, hc, "var(--g7-text)", 22);
     const body = "M10 34 L210 34 L204 120 Q203 124 199 124 L21 124 Q17 124 16 120 Z";
     return `<defs>
       <linearGradient id="${id}c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".25"/><stop offset=".35" stop-color="#fff" stop-opacity=".3"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></linearGradient>
@@ -95,14 +107,14 @@
       <rect x="30" y="30" width="20" height="16" rx="3" fill="#3f6fd1"/><rect x="170" y="30" width="20" height="16" rx="3" fill="#3f6fd1"/>${more}`;
   };
 
-  const dryerSvg = (id, show, slots, count, h, t, hc) => {
+  const dryerSvg = (id, show, slots, count, h, t, hc, big) => {
     const X0 = 22, X1 = 198, gap = (X1 - X0) / Math.max(slots, 1), cy = 76, r = Math.min(23, gap / 2 - 3);
     let rolls = "";
     for (let i = 0; i < slots; i++) {
       const p = show[i], cx = X0 + gap * i + gap / 2;
-      rolls += p ? faceRoll(id, p, cx, cy, r, "#2b3038") : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#6b7480" stroke-dasharray="3 3"/>`;
+      rolls += p ? isResin(p) ? bottle(cx - r * 0.7, cy + r, r * 1.4, r * 2, p) : faceRoll(id, p, cx, cy, r, "#2b3038") : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#6b7480" stroke-dasharray="3 3"/>`;
     }
-    const nums = slots ? readout(110, 44, h, t, hc, "#e5e7eb") : readout(110, 72, h, t, hc, "#e5e7eb", 22);
+    const nums = !big ? readout(110, 44, h, t, hc, "#e5e7eb") : readout(110, 72, h, t, hc, "#e5e7eb", 22);
     return `<defs>${rollGrad(id)}
       <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dfe6ee" stop-opacity=".26"/><stop offset="1" stop-color="#9aa6b2" stop-opacity=".14"/></linearGradient>
       <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".4" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
@@ -113,14 +125,14 @@
       <circle cx="58" cy="113.5" r="2.5" fill="${hc}"/><circle cx="164" cy="113.5" r="3.5" fill="rgba(150,165,180,.7)"/><circle cx="176" cy="113.5" r="3.5" fill="rgba(150,165,180,.7)"/>`;
   };
 
-  const shelfSvg = (id, show, slots, count, h, t, hc) => {
+  const shelfSvg = (id, show, slots, count, h, t, hc, big) => {
     const X0 = 12, X1 = 208, gap = (X1 - X0) / Math.max(slots, 1), r = Math.min(28, gap / 2 - 3), cy = 98 - r;
     let rolls = "";
     for (let i = 0; i < slots; i++) {
       const p = show[i], cx = X0 + gap * i + gap / 2;
-      rolls += p ? faceRoll(id, p, cx, cy, r, "#3a4049") : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#b8c0ca" stroke-dasharray="3 3"/>`;
+      rolls += p ? isResin(p) ? bottle(cx - r * 0.7, cy + r, r * 1.4, r * 2, p) : faceRoll(id, p, cx, cy, r, "#3a4049") : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#b8c0ca" stroke-dasharray="3 3"/>`;
     }
-    const nums = slots ? readout(110, 30, h, t, hc, "var(--g7-text)") : readout(110, 64, h, t, hc, "var(--g7-text)", 22);
+    const nums = !big ? readout(110, 30, h, t, hc, "var(--g7-text)") : readout(110, 64, h, t, hc, "var(--g7-text)", 22);
     return `<defs>${rollGrad(id)}
       <linearGradient id="${id}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9b48a"/><stop offset="1" stop-color="#a97a4e"/></linearGradient></defs>
       <rect x="4" y="10" width="212" height="88" rx="4" fill="rgba(200,206,214,.16)" stroke="rgba(150,160,170,.35)"/>
@@ -133,16 +145,16 @@
 
   const boxSvg = (name, spools, count, h, t, over) => {
     const id = "g7b" + (++boxN), kind = boxKind(name), max = kind === "bin" ? 5 : 4;
-    const show = spools ? spools.slice(0, max) : [], slots = spools ? Math.max(show.length, Math.min(count, max), 1) : 0;
+    const show = spools ? spools.slice(0, max) : [], slots = spools ? Math.max(show.length, Math.min(count, max)) : 0;   // 0.8.11 an empty box draws no empty slot
     const draw = kind === "dryer" ? dryerSvg : kind === "shelf" ? shelfSvg : binSvg;
-    return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true" class="${over ? "over" : ""}">${draw(id, show, slots, count, h, t, humCol(h, over))}</svg>`;
+    return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true" class="${over ? "over" : ""}">${draw(id, show, slots, count, h, t, humCol(h, over), spools === null)}</svg>`;
   };
   // 0.8.5 rolls in no storage box: standing on a bare desk, a dashed outline where a box would be (no humidity — open air)
   const looseSvg = (spools, count) => {
     const id = "g7b" + (++boxN), show = spools ? spools.slice(0, 5) : [], slots = show.length;
     const X0 = 12, X1 = 208, gap = (X1 - X0) / Math.max(slots, 1), r = Math.min(26, gap / 2 - 3), cy = 104 - r;
     let rolls = "";
-    show.forEach((p, i) => { rolls += faceRoll(id, p, X0 + gap * i + gap / 2, cy, r, "#3a4049"); });
+    show.forEach((p, i) => { const cx = X0 + gap * i + gap / 2; rolls += isResin(p) ? bottle(cx - r * 0.7, cy + r, r * 1.4, r * 2, p) : faceRoll(id, p, cx, cy, r, "#3a4049"); });
     const label = slots ? "" : `<text x="110" y="84" font-size="26" font-weight="700" text-anchor="middle" fill="#8a929c">${count}</text>`;
     return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true"><defs>${rollGrad(id)}</defs>
       <rect x="6" y="20" width="208" height="84" rx="10" fill="none" stroke="#b8c0ca" stroke-width="1.5" stroke-dasharray="6 5"/>
@@ -297,7 +309,7 @@
 
     _mini(sp) {   // list look: the rolls as small coloured spools
       if (!sp || !sp.length) return "";
-      return `<div class="mini">${sp.slice(0, 8).map((p) => spoolSvg(colorOf(p), p.pct, 18)).join("")}${sp.length > 8 ? `<small>+${sp.length - 8}</small>` : ""}</div>`;
+      return `<div class="mini">${sp.slice(0, 8).map((p) => itemSvg(p, 18)).join("")}${sp.length > 8 ? `<small>+${sp.length - 8}</small>` : ""}</div>`;
     }
     _sep() { return this._cfg.spools === "separate"; }   // 0.8.7 default = rolls in the box picture, sensor numbers on the right
     _stock(L, by, boxes = []) {
@@ -307,11 +319,13 @@
       const fold = !this._sep() && this._show.includes("boxes") && names.size;   // 0.8.3 spools: in_boxes (default) — boxes draw theirs
       const list = fold ? every.filter((p) => !(p.box && names.has(String(p.box).trim()))) : every, boxed = every.length - list.length;
       const shown = open ? list : list.slice(0, 8);
-      const rows = shown.map((p) => `<div class="sp">${spoolSvg(colorOf(p), p.pct)}<div class="b"><div class="t">${esc([p.material, p.color].filter(Boolean).join(" · "))}</div>
+      const rows = shown.map((p) => `<div class="sp">${itemSvg(p)}<div class="b"><div class="t">${esc([p.material, p.color].filter(Boolean).join(" · "))}</div>
         <div class="s">${[p.brand ? esc(p.brand) : "", p.box && names.has(String(p.box).trim()) ? `<em>📦 ${esc(p.box)}</em>` : `<em class="out">${esc(L.outside)}</em>`].filter(Boolean).join(" · ") || "&nbsp;"}</div></div>
         <div class="g">${num(p.grams) !== null ? p.grams.toLocaleString() + " g" : p.pct + "%"}<div class="bar ${p.low ? "low" : ""}"><i style="width:${Math.max(3, Math.min(100, p.pct))}%"></i></div></div></div>`).join("");
-      const big = grams ? `<strong>${(grams / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}</strong> <small>kg</small>` : `<strong>${this._val(s)}</strong> <small>${esc(L.rolls)}</small>`;
-      return `<div class="sec"><h3>🧵 ${esc(L.stock)}</h3><div class="big"><span>${big}</span><small>${this._val(s)} ${esc(L.rolls)}</small></div>${rows || (boxed ? "" : `<div class="empty">${esc(L.none)}</div>`)}
+      const resin = num(s.attributes.resin) ?? every.filter(isResin).length, resinG = every.filter(isResin).reduce((a, p) => a + (num(p.grams) || 0), 0);
+      const kg = grams ? Math.max(0, grams - resinG) : 0, rollsN = Math.max(0, this._val(s) - resin);   // 0.8.11 🧪 resin counted apart
+      const big = kg ? `<strong>${(kg / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}</strong> <small>kg</small>` : `<strong>${this._val(s)}</strong> <small>${esc(L.rolls)}</small>`;
+      return `<div class="sec"><h3>🧵 ${esc(L.stock)}</h3><div class="big"><span>${big}</span><small>${rollsN} ${esc(L.rolls)}${resin ? ` · 🧪 ${esc(L.resin)} ${resin}${esc(L.bottles)}` : ""}</small></div>${rows || (boxed ? "" : `<div class="empty">${esc(L.none)}</div>`)}
         ${boxed ? `<div class="inbox">📦 ${esc(L.inbox.replace("{n}", boxed))}</div>` : ""}
         ${list.length > 8 ? `<button class="more" data-more="stock">${open ? esc(L.less) : `${esc(L.all)} (${list.length})`}</button>` : ""}</div>`;
     }
