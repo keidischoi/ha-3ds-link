@@ -158,6 +158,14 @@
       },
       "devices": {
         "name": "통신 중인 센서"
+      },
+      "site_device": {
+        "name": "센서",
+        "state": {
+          "online": "통신 중",
+          "offline": "끊김",
+          "never": "안 옴"
+        }
       }
     }
   }

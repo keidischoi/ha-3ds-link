@@ -158,6 +158,14 @@
       },
       "devices": {
         "name": "Sensors online"
+      },
+      "site_device": {
+        "name": "Sensor",
+        "state": {
+          "online": "Online",
+          "offline": "Offline",
+          "never": "Never connected"
+        }
       }
     }
   }

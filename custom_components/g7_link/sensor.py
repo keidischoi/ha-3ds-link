@@ -16,9 +16,9 @@ from urllib.parse import urlparse
 
 import aiohttp
 
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator, UpdateFailed
@@ -98,10 +98,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ents: list[SensorEntity] = [StatusSensor(coord, uid, site, *s) for s in SENSORS]
     ents.append(ListSensor(coord, uid, site, "printers", "mdi:printer-3d", lambda p: p.get("state") in ("printing", "paused")))   # 0.6.0 state = printing now
     ents.append(ListSensor(coord, uid, site, "devices", "mdi:access-point-network", lambda d: bool(d.get("live"))))           # 0.6.0 state = sensors talking to the site
-    for box in (coord.data or {}).get("boxes") or []:
-        if isinstance(box, dict) and box.get("key"):
-            ents.append(BoxSensor(coord, uid, site, str(box["key"]), str(box.get("name") or box["key"])))
     async_add_entities(ents)
+
+    # 0.6.1 one entity per storage box and per connected sensor on the site — new ones appear by themselves
+    known: set[str] = set()
+
+    @callback
+    def _add_new() -> None:
+        data = coord.data or {}
+        new: list[SensorEntity] = []
+        for box in data.get("boxes") or []:
+            if isinstance(box, dict) and box.get("key") and f"b:{box['key']}" not in known:
+                known.add(f"b:{box['key']}")
+                new.append(BoxSensor(coord, uid, site, str(box["key"]), str(box.get("name") or box["key"])))
+        for dev in data.get("devices") or []:
+            if isinstance(dev, dict) and dev.get("id") and f"d:{dev['id']}" not in known:
+                known.add(f"d:{dev['id']}")
+                new.append(SiteDeviceSensor(coord, uid, site, int(dev["id"]), str(dev.get("name") or dev["id"])))
+        if new:
+            async_add_entities(new)
+
+    _add_new()
+    entry.async_on_unload(coord.async_add_listener(_add_new))
 
 
 class StatusSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
@@ -217,3 +235,52 @@ class ListSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         items = self._list() or []
         return {self._key: items, "total": len(items), "g7": self._key, "site": self._site}
+
+
+class SiteDeviceSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
+    """0.6.1 one sensor connected to the site (HA · SmartThings · Matter · MQTT · BLE …): state = online / offline / never.
+
+    Temperature · humidity · where it is attached · how it connects · last message are attributes.
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["online", "offline", "never"]
+    _attr_translation_key = "site_device"
+    _unrecorded_attributes = BIG
+
+    def __init__(self, coord: StatusCoordinator, uid: str, site: str, dev_id: int, name: str) -> None:
+        super().__init__(coord)
+        self._id, self._site = dev_id, uid.split(":")[0]
+        self._attr_unique_id = f"{uid}:dev:{dev_id}"
+        self._attr_name = name
+        self._attr_device_info = _device(site, uid)
+
+    def _dev(self) -> dict[str, Any] | None:
+        for d in (self.coordinator.data or {}).get("devices") or []:
+            if isinstance(d, dict) and d.get("id") == self._id:
+                return d
+        return None
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._dev() is not None
+
+    @property
+    def native_value(self) -> str | None:
+        d = self._dev()
+        if d is None:
+            return None
+        return "online" if d.get("live") else ("never" if d.get("never") else "offline")
+
+    @property
+    def icon(self) -> str:
+        v = self.native_value
+        return "mdi:access-point-check" if v == "online" else ("mdi:access-point-off" if v == "offline" else "mdi:access-point-remove")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self._dev() or {}
+        out = {"temperature": d.get("temp"), "humidity": d.get("humidity"), "attached_to": d.get("where"), "connection": d.get("source"),
+               "ha_server": d.get("server"), "device_state": d.get("state"), "over_limit": d.get("over"), "company": d.get("company"), "last_seen": d.get("seen")}
+        return {**{k: v for k, v in out.items() if v not in (None, "")}, "g7": "site_device", "site": self._site}

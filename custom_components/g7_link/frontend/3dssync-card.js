@@ -5,7 +5,7 @@
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.6.0";
+  const VER = "0.6.1";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
@@ -109,9 +109,16 @@
     }
     _t() { return T[String((this._hass && this._hass.language) || "en").startsWith("ko") ? "ko" : "en"]; }
     _data() {
+      // 0.6.1 several sites (mini PC · NAS …): the configured one, else the one with the most to show
+      const all = this._ours(this._hass), score = {};
+      for (const s of all) {
+        const a = s.attributes, k = a.site || "";
+        score[k] = (score[k] || 0) + 1 + ((a.devices || []).length + (a.spools || []).length + (a.printers || []).length) * 2;
+      }
+      const site = this._cfg.site || Object.keys(score).sort((x, y) => score[y] - score[x])[0];
       const by = {}, boxes = [];
-      for (const s of this._ours(this._hass)) {
-        if (this._cfg.site && s.attributes.site !== this._cfg.site) continue;
+      for (const s of all) {
+        if (s.attributes.site !== site || s.attributes.g7 === "site_device") continue;
         if (s.attributes.g7 === "box") boxes.push(s); else if (!by[s.attributes.g7]) by[s.attributes.g7] = s;
       }
       return { by, boxes };
