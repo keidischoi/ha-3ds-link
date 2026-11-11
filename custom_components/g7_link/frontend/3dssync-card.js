@@ -2,20 +2,21 @@
  * Reads the 3DSSync sensors (attribute "g7" marks them), so it needs no setup: add "3DSSync" from the card picker.
  *   type: custom:g7-3dssync-card          everything
  *   show: [summary, printers, stock, boxes, sensors]   (optional — pick parts)
+ *   box_look: list                       (optional — the earlier text tiles instead of box pictures)
  *   spools: separate                     (optional — rolls only in the stock list; default draws them inside the box pictures)
  *   type: custom:g7-3dssync-printer-card | g7-3dssync-stock-card | g7-3dssync-sensors-card   one part
  */
 (() => {
-  const VER = "0.8.4";
+  const VER = "0.8.5";
   const T = {
     ko: { printers: "프린터", stock: "필라멘트 재고", boxes: "보관함", sensors: "연결된 센서", rolls: "롤", all: "모두 보기", less: "접기",
       idle: "대기", printing: "출력 중", paused: "일시 정지", done: "끝남", failed: "실패", offline: "꺼짐", left: "남음", nozzle: "노즐", bed: "베드",
       unread: "알림", orders: "주문", bids: "입찰", low: "조금 남음", live: "통신 중", lost: "끊김", never: "안 옴", none: "아직 없어요",
-      over: "습도 높음", nodata: "3DSSync 센서를 찾지 못했어요 — 통합을 먼저 연결하세요.", ago_m: "분 전", ago_h: "시간 전", ago_d: "일 전", now: "방금", min: "분", h: "시간", company: "업체", inbox: "보관함에 든 {n}롤은 아래 보관함 그림에" },
+      over: "습도 높음", nodata: "3DSSync 센서를 찾지 못했어요 — 통합을 먼저 연결하세요.", ago_m: "분 전", ago_h: "시간 전", ago_d: "일 전", now: "방금", min: "분", h: "시간", company: "업체", inbox: "보관함에 든 {n}롤은 아래 보관함 그림에", outside: "보관함 밖" },
     en: { printers: "Printers", stock: "Filament stock", boxes: "Storage boxes", sensors: "Connected sensors", rolls: "rolls", all: "Show all", less: "Show less",
       idle: "Idle", printing: "Printing", paused: "Paused", done: "Done", failed: "Failed", offline: "Off", left: "left", nozzle: "Nozzle", bed: "Bed",
       unread: "Notices", orders: "Orders", bids: "Bids", low: "Low", live: "Live", lost: "Lost", never: "Never", none: "Nothing yet",
-      over: "Too humid", nodata: "No 3DSSync sensors found — set up the integration first.", ago_m: "min ago", ago_h: "h ago", ago_d: "d ago", now: "just now", min: "min", h: "h", company: "Company", inbox: "{n} rolls in storage boxes are drawn in the boxes below" },
+      over: "Too humid", nodata: "No 3DSSync sensors found — set up the integration first.", ago_m: "min ago", ago_h: "h ago", ago_d: "d ago", now: "just now", min: "min", h: "h", company: "Company", inbox: "{n} rolls in storage boxes are drawn in the boxes below", outside: "Not in a box" },
   };
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const num = (v) => (typeof v === "number" && isFinite(v) ? v : null);
@@ -139,6 +140,19 @@
     const draw = kind === "dryer" ? dryerSvg : kind === "shelf" ? shelfSvg : binSvg;
     return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true" class="${over ? "over" : ""}">${draw(id, show, slots, count, h, t, humCol(h, over))}</svg>`;
   };
+  // 0.8.5 rolls in no storage box: standing on a bare desk, a dashed outline where a box would be (no humidity — open air)
+  const looseSvg = (spools, count) => {
+    const id = "g7b" + (++boxN), show = spools ? spools.slice(0, 5) : [], slots = show.length;
+    const X0 = 12, X1 = 208, gap = (X1 - X0) / Math.max(slots, 1), r = Math.min(26, gap / 2 - 3), cy = 104 - r;
+    let rolls = "";
+    show.forEach((p, i) => { rolls += faceRoll(id, p, X0 + gap * i + gap / 2, cy, r, "#3a4049"); });
+    const label = slots ? "" : `<text x="110" y="84" font-size="26" font-weight="700" text-anchor="middle" fill="#8a929c">${count}</text>`;
+    return `<svg viewBox="0 0 220 132" width="100%" aria-hidden="true"><defs>${rollGrad(id)}</defs>
+      <rect x="6" y="20" width="208" height="84" rx="10" fill="none" stroke="#b8c0ca" stroke-width="1.5" stroke-dasharray="6 5"/>
+      ${rolls}${label}${count > slots && slots ? `<text x="208" y="34" font-size="10" font-weight="700" text-anchor="end" fill="#6b7480">+${count - slots}</text>` : ""}
+      <path d="M0 104 H220 L212 116 H8 Z" fill="#cfd5dc"/><rect x="8" y="116" width="204" height="4" rx="2" fill="#aeb6c0"/>
+      <text x="110" y="129" font-size="8.5" text-anchor="middle" fill="#8a929c">💧 --</text></svg>`;
+  };
   const printerSvg = (busy) => `<svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true" class="${busy ? "busy" : ""}">
     <rect x="6" y="6" width="52" height="52" rx="7" fill="var(--g7-soft)" stroke="var(--g7-line)"/>
     <rect x="12" y="11" width="40" height="4" rx="2" fill="var(--g7-dim)"/>
@@ -171,7 +185,8 @@
     .sp .s{font-size:.78rem;color:var(--g7-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sp .s em{font-style:normal;color:var(--g7-accent)}
     .sp .g{text-align:right;width:76px;font-weight:600;font-size:.9rem;color:var(--g7-text)}
     .more{width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1px solid var(--g7-line);background:none;color:var(--g7-accent);font-weight:600;cursor:pointer;font:inherit}
-    .boxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}.bx .art{margin:4px 0 2px}.bx svg.over .lcd{animation:g7glow 1.6s ease-in-out infinite}@keyframes g7glow{50%{opacity:.55}}
+    .boxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}.bx .art{margin:4px 0 2px}.boxes.list{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.mini{display:flex;flex-wrap:wrap;gap:2px;align-items:center;margin:2px 0 4px}.mini small{font-size:.7rem;color:var(--g7-dim)}.bx.loose{border-style:dashed}
+    .bx svg.over .lcd{animation:g7glow 1.6s ease-in-out infinite}@keyframes g7glow{50%{opacity:.55}}
     .inbox{font-size:.78rem;color:var(--g7-dim);padding:8px 0 0}
     .bx{border:1px solid var(--g7-line);border-radius:12px;padding:10px}.bx.over{border-color:var(--g7-bad);background:color-mix(in srgb,var(--g7-bad) 7%,transparent)}
     .bx .t{font-weight:600;font-size:.88rem;color:var(--g7-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -282,6 +297,10 @@
       return `<div class="sec"><h3>🖨️ ${esc(L.printers)} <b>${list.length}</b></h3>${rows || `<div class="empty">${esc(L.none)}</div>`}</div>`;
     }
 
+    _mini(sp) {   // list look: the rolls as small coloured spools
+      if (!sp || !sp.length) return "";
+      return `<div class="mini">${sp.slice(0, 8).map((p) => spoolSvg(colorOf(p), p.pct, 18)).join("")}${sp.length > 8 ? `<small>+${sp.length - 8}</small>` : ""}</div>`;
+    }
     _sep() { return this._cfg.spools === "separate"; }
     _stock(L, by, boxes = []) {
       const s = by.filament_total; if (!s) return "";
@@ -301,15 +320,22 @@
 
     _boxes(L, by, boxes) {
       if (!boxes.length) return "";
+      const list = this._cfg.box_look === "list";   // 0.8.5 box_look: list — the earlier text tiles
       const all = (by.filament_total && by.filament_total.attributes.spools) || [];
       const tiles = boxes.map((s) => {
         const a = s.attributes, h = num(a.humidity), t = num(a.temp);
         const inside = this._sep() ? null : all.filter((p) => p.box && a.name && String(p.box).trim() === String(a.name).trim());
         return `<div class="bx ${a.over ? "over" : ""}" data-ent="${esc(s.entity_id)}" style="cursor:pointer"><div class="t">📦 ${esc(a.name || s.attributes.friendly_name)}</div>
-          <div class="art">${boxSvg(a.name, inside, this._val(s), h, t, !!a.over)}</div>
-          <div class="s">🧵 ${this._val(s)} ${esc(L.rolls)}${a.low ? ` (${esc(L.low)} ${a.low})` : ""}</div>${a.over ? `<div class="s warn">⚠ ${esc(L.over)}</div>` : ""}</div>`;
+          ${list ? `<div class="h">💧 ${h !== null ? Math.round(h) + "%" : "—"}</div>${this._mini(inside)}<div class="s">${t !== null ? `🌡 ${t.toFixed(1)}°C · ` : ""}`
+            : `<div class="art">${boxSvg(a.name, inside, this._val(s), h, t, !!a.over)}</div><div class="s">`}🧵 ${this._val(s)} ${esc(L.rolls)}${a.low ? ` (${esc(L.low)} ${a.low})` : ""}</div>${a.over ? `<div class="s warn">⚠ ${esc(L.over)}</div>` : ""}</div>`;
       }).join("");
-      return `<div class="sec"><h3>📦 ${esc(L.boxes)} <b>${boxes.length}</b></h3><div class="boxes">${tiles}</div></div>`;
+      // 0.8.5 rolls in no box (no box set, or a box name the site has no storage box for) — their own tile
+      const names = new Set(boxes.map((b) => String(b.attributes.name || "").trim()).filter(Boolean));
+      const loose = all.filter((p) => !(p.box && names.has(String(p.box).trim())));
+      const out = loose.length ? `<div class="bx loose" ${by.filament_total ? `data-ent="${esc(by.filament_total.entity_id)}" style="cursor:pointer"` : ""}><div class="t">🧵 ${esc(L.outside)}</div>
+          ${list ? `<div class="h">💧 —</div>${this._mini(this._sep() ? null : loose)}` : `<div class="art">${looseSvg(this._sep() ? null : loose, loose.length)}</div>`}
+          <div class="s">🧵 ${loose.length} ${esc(L.rolls)}${loose.some((p) => p.low) ? ` (${esc(L.low)} ${loose.filter((p) => p.low).length})` : ""}</div></div>` : "";
+      return `<div class="sec"><h3>📦 ${esc(L.boxes)} <b>${boxes.length}</b></h3><div class="boxes ${list ? "list" : ""}">${tiles}${out}</div></div>`;
     }
 
     _sensors(L, by) {
@@ -359,10 +385,14 @@
           ${g.map((k) => `<option value="${esc(k)}" ${this._cfg.site === k ? "selected" : ""}>${esc(k)}</option>`).join("")}</select>
           <b>${ko ? "보여 줄 것 (아무것도 안 고르면 카드 기본)" : "Parts (none = the card's default)"}</b>
           ${SECTIONS.map((k) => `<label><input type="checkbox" data-k="${k}" ${show.includes(k) ? "checked" : ""}> ${esc(names[k])}</label>`).join("")}
+          <b>${ko ? "보관함 모양" : "Storage box look"}</b>
+          <select id="box_look"><option value="">${ko ? "그림 (건조기 · 선반 · 수납함)" : "Pictures (dryer · shelf · bin)"}</option>
+          <option value="list" ${this._cfg.box_look === "list" ? "selected" : ""}>${ko ? "목록 (예전 모양 — 습도 숫자 크게)" : "List (the earlier look — big humidity number)"}</option></select>
           <b>${ko ? "필라멘트 롤 보여 주기" : "Filament rolls"}</b>
           <select id="spools"><option value="">${ko ? "보관함 그림 안에 (재고 목록엔 보관함 밖 롤만)" : "Inside the box pictures (stock list: rolls outside boxes)"}</option>
           <option value="separate" ${this._cfg.spools === "separate" ? "selected" : ""}>${ko ? "따로 — 재고 목록에 모두, 보관함은 롤 수만" : "Separate — all in the stock list, boxes show the count"}</option></select></div>`;
         this.querySelector("#site").addEventListener("change", (e) => this._set("site", e.target.value || undefined));
+        this.querySelector("#box_look").addEventListener("change", (e) => this._set("box_look", e.target.value || undefined));
         this.querySelector("#spools").addEventListener("change", (e) => this._set("spools", e.target.value || undefined));
         this.querySelectorAll("input[data-k]").forEach((c) => c.addEventListener("change", () => {
           const v = [...this.querySelectorAll("input[data-k]:checked")].map((x) => x.dataset.k);
