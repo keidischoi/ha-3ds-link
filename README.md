@@ -1,6 +1,8 @@
-<img src="custom_components/g7_link/brand/icon.png" alt="3ds" width="96" align="right">
+<img src="custom_components/g7_link/brand/icon.png" alt="3DSSync" width="96" align="right">
 
-# 3ds — Home Assistant integration
+# 3DSSync — Home Assistant integration
+
+> Formerly named **3ds**. Same integration (domain `g7_link`) — existing setups keep working.
 
 Sends Home Assistant temperature / humidity sensors, printer / device state and camera snapshots to a **G7 (Gnuboard 7)** site running the **📡 IoT Link** plugin.
 No YAML — you just pick sensors in the UI.
@@ -53,13 +55,13 @@ https://github.com/keidischoi/ha-3ds-link
 
 ### 2. Download and restart
 
-Open **3ds** → **Download** → **restart** Home Assistant (Settings › System › Restart).
+Open **3DSSync** → **Download** → **restart** Home Assistant (Settings › System › Restart).
 
-<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/2-download.png" alt="Download 3ds" width="760"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/2-download.png" alt="Download 3DSSync" width="760"></p>
 
 ### 3. Add the integration
 
-Settings › Devices & services → **Add integration** (bottom right) → search for **3ds**.
+Settings › Devices & services → **Add integration** (bottom right) → search for **3DSSync**.
 
 <p align="center"><img src="https://raw.githubusercontent.com/keidischoi/ha-3ds-link/main/docs/3-add.png" alt="Find 3ds in Add integration" width="760"></p>
 
@@ -100,8 +102,8 @@ Choose **⚡ Find and connect automatically** at the top: Home Assistant devices
 ## Quick summary (HACS)
 
 1. HACS › ⋮ (top right) › **Custom repositories** › `https://github.com/keidischoi/ha-3ds-link` · type **Integration** › Add
-2. Download **3ds** and restart Home Assistant
-3. Settings › Devices & services › **Add integration** › "3ds"
+2. Download **3DSSync** and restart Home Assistant
+3. Settings › Devices & services › **Add integration** › "3DSSync"
 4. Paste the **site address** and **link code** shown under the site's IoT Link › ➕ Add device
 5. Choose where to attach (filament storage · My Printer · company equipment · other) and the sensors — done
 

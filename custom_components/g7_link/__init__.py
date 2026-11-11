@@ -1,4 +1,4 @@
-"""3ds — Home Assistant 의 온습도 · 기기 상태 · 카메라 사진을 G7 사이트(📡 IoT 연결 플러그인 — 예전 HA 연결)로 보냄.
+"""3DSSync (예전 이름 3ds) — Home Assistant 의 온습도 · 기기 상태 · 카메라 사진을 G7 사이트(📡 IoT 연결 플러그인 — 예전 HA 연결)로 보냄.
 
 통합 하나 = 사이트의 기기 하나. 사이트가 이 Home Assistant 로 접속하는 일은 없고, 여기서 보내기만 함.
 
@@ -59,6 +59,8 @@ _NET_ERRORS = (aiohttp.ClientError, TimeoutError, OSError)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """통합 하나를 시작 — 기기 하나짜리, 또는 한꺼번에 연결한 기기 여러 대."""
+    if entry.title.startswith("3ds — "):   # 0.4.2 이름 3ds → 3DSSync (예전에 만든 연결 이름도 바꿈)
+        hass.config_entries.async_update_entry(entry, title="3DSSync — " + entry.title[len("3ds — "):])
     conf: dict[str, Any] = {**entry.data, **entry.options}
     devices = conf.get(CONF_DEVICES)
     if isinstance(devices, list) and devices:
@@ -94,7 +96,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
             resp = await hub_request(async_get_clientsession(hass), "DELETE", data.get(CONF_SITE, ""), f"{data.get(CONF_CODE, '')}/devices/{device_id or 0}", hass=hass, timeout=_TIMEOUT)
             resp.release()
         except _NET_ERRORS as err:
-            _LOGGER.debug("3ds: could not remove the device on the site: %s", err)
+            _LOGGER.debug("3DSSync: could not remove the device on the site: %s", err)
 
 
 def _int(value: Any, default: int) -> int:
@@ -280,7 +282,7 @@ class Pusher:
         try:
             resp = await async_get_clientsession(self.hass).post(self.push_url, json=payload, headers=await server_headers(self.hass), timeout=_TIMEOUT)   # 0.4.0 예전에 만든 기기도 서버가 적힘
             if resp.status >= 400:
-                _LOGGER.debug("3ds %s: the site did not accept the values (%s)", self.title, resp.status)
+                _LOGGER.debug("3DSSync %s: the site did not accept the values (%s)", self.title, resp.status)
                 resp.release()
                 return
             try:
@@ -290,7 +292,7 @@ class Pusher:
             if isinstance(answer, dict):
                 self._apply_site(answer)
         except _NET_ERRORS as err:
-            _LOGGER.debug("3ds %s: could not send: %s", self.title, err)
+            _LOGGER.debug("3DSSync %s: could not send: %s", self.title, err)
 
     # ── 카메라 사진 (없어도 되는 것 — 무엇이 잘못돼도 값 보내기에는 영향 없음) ──
 
@@ -318,7 +320,7 @@ class Pusher:
                 self._last_snap = time.monotonic()
             resp.release()
         except Exception as err:  # noqa: BLE001 — 카메라 종류 · 버전마다 내는 오류가 달라 넓게 잡음
-            _LOGGER.debug("3ds %s: could not send the camera snapshot: %s", self.title, err)
+            _LOGGER.debug("3DSSync %s: could not send the camera snapshot: %s", self.title, err)
 
     async def _camera_image(self, camera_entity: str) -> bytes | None:
         # 카메라 통합이 없는 집에서도 켜지게 여기서 불러옴
