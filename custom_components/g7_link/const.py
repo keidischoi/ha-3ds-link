@@ -1,7 +1,8 @@
 """G7 연결 — 상수."""
 
 DOMAIN = "g7_link"
-VERSION = "0.6.1"   # same as manifest.json (card file ?v=)
+CONF_SCOPES = "scopes"   # 0.7.0 which site data to bring in: "me" (personal) · "c:{company id}" — none saved = all the site offers
+VERSION = "0.7.0"   # same as manifest.json (card file ?v=)
 
 CONF_SITE = "site"
 CONF_CODE = "code"

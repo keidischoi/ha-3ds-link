@@ -124,6 +124,18 @@ Needs the site's IoT link plugin **1.19.0+**. Every 5 minutes the integration re
 
 Use them in automations — e.g. notify your phone when *Bids on my requests* goes up, or when a box's `over` becomes true. No personal data (names, addresses, phone numbers) is sent. If several entries use the same link code, only one set of sensors is made. New storage boxes appear after reloading the integration.
 
+## Personal and company data (0.7.0+)
+
+When you connect, pick what to bring in: **👤 personal** and/or each **🏢 company** you belong to (IoT link 1.19.12+). Change it later under Configure → *Personal / company data*.
+
+Every choice gets its own devices — one box each on the device page, all under the **3DSSync — <site>** device:
+
+- Notices · orders (personal only)
+- Requests · bids (personal: your requests and your own bids · company: bids placed as the company, requests recommended to it)
+- Filament stock · Storage boxes · Connected sensors · Printers (personal)
+
+Cards: pick the server and scope in the card editor (*Automatic* = the one with the most data). The sidebar panel has a tab per server and scope.
+
 ## Dashboard cards and sidebar panel (0.6.0+)
 
 After the restart **3DSSync** appears in the sidebar (printers, filament stock, storage boxes, connected sensors), and four cards are in the dashboard card picker — no extra download:
