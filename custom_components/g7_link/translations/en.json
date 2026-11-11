@@ -7,6 +7,10 @@
         "data": {
           "site": "Site address",
           "code": "Link code"
+        },
+        "data_description": {
+          "site": "Pick a site you connected before (mini PC, NAS …) or type a new address.",
+          "code": "Different on every site — copy it from that site's IoT link page."
         }
       },
       "target": {
