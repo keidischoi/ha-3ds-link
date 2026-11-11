@@ -4,6 +4,7 @@ Each version has its own [GitHub release](https://github.com/keidischoi/ha-3ds-l
 
 ## 0.8 — storage box pictures and one device per personal / company (2026-11-11)
 
+- **0.8.14** 🗂 The box type picked on the site (storage bin · filament dryer · shelf) chooses the picture; boxes with no type still go by their name. Needs IoT link 1.19.14+ and stock management 0.3.123+.
 - **0.8.13** 🎨 Box colours synced from the site (the colour picked in stock management, or the one its name gives): bin lid, dryer and shelf edges and a dot before the name. Humidity warnings still turn it orange / red. Needs IoT link 1.19.13+.
 - **0.8.12** Warning colours on the box picture: bin lid, dryer body and shelf back turn orange from 50 % humidity and red over the box limit; the tile border follows.
 - **0.8.11** 🧪 Resin drawn as bottles (stock list, box pictures, *Not in a box*) and counted apart from filament rolls (kg = filament only). An empty box no longer draws an empty slot.

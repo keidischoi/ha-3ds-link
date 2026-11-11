@@ -290,7 +290,7 @@ class BoxSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         b = self._box() or {}
-        return {**{k: b.get(k) for k in ("name", "low", "humidity", "temp", "humidity_max", "over", "seen_at", "color")}, "g7": "box", "site": self._site}
+        return {**{k: b.get(k) for k in ("name", "low", "humidity", "temp", "humidity_max", "over", "seen_at", "color", "kind")}, "g7": "box", "site": self._site}
 
 
 class ListSensor(CoordinatorEntity[StatusCoordinator], SensorEntity):
