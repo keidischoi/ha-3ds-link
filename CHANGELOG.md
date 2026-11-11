@@ -4,6 +4,7 @@ Each version has its own [GitHub release](https://github.com/keidischoi/ha-3ds-l
 
 ## 0.8 — storage box pictures and one device per personal / company (2026-11-11)
 
+- **0.8.11** 🧪 Resin drawn as bottles (stock list, box pictures, *Not in a box*) and counted apart from filament rolls (kg = filament only). An empty box no longer draws an empty slot.
 - **0.8.10** Box pictures: humidity and temperature side by side on one line at the top; rolls use the full width below.
 - **0.8.9** Filament dryer and *Not in a box* desk translucent too — every picture fits dark themes.
 - **0.8.8** Storage bin and shelf translucent instead of solid white; temperature text in the theme colour.

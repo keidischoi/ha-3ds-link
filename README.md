@@ -142,7 +142,7 @@ After the restart **3DSSync** appears in the sidebar (a tab per server and perso
 |---|---|
 | `custom:g7-3dssync-card` | everything: summary, printers, filament stock, storage boxes, connected sensors |
 | `custom:g7-3dssync-printer-card` | printers with progress, time left, nozzle / bed temperature |
-| `custom:g7-3dssync-stock-card` | every spool drawn in its colour with what is left |
+| `custom:g7-3dssync-stock-card` | every spool (and 🧪 resin bottle) drawn in its colour with what is left |
 | `custom:g7-3dssync-sensors-card` | storage boxes and which sensors are talking to the site |
 
 Card options (all can be set in the card editor too):
@@ -155,7 +155,7 @@ Card options (all can be set in the card editor too):
 | `spools` | `separate` — box pictures show only the numbers, big; every roll stays in the stock list | rolls drawn inside the boxes |
 | `hide_where` | `true` — hide the 📍 server · scope line | shown when you have more than one |
 
-**Storage box pictures.** The box sensor's humidity and temperature are on one line at the top (green under 50 %, orange from 50 %, red and blinking over the box's limit, 📡 *No sensor* when none is attached), and the rolls stand below in their real colours, filled by what is left. The box name picks the picture:
+**Storage box pictures.** The box sensor's humidity and temperature are on one line at the top (green under 50 %, orange from 50 %, red and blinking over the box's limit, 📡 *No sensor* when none is attached), and the rolls stand below in their real colours, filled by what is left. 🧪 Resin is drawn as a bottle (amber body, its colour filled by what is left) and counted on its own: the stock card shows *N rolls · 🧪 resin M bottles*, and the kg total is filament only. The box name picks the picture:
 
 | Box name contains | Picture | Rolls drawn |
 |---|---|---|
