@@ -123,5 +123,36 @@
       "invalid_code": "연결 코드가 맞지 않아요. 사이트에서 다시 복사해 주세요.",
       "cannot_connect": "사이트에 닿지 않아요. 주소를 확인해 주세요."
     }
+  },
+  "entity": {
+    "sensor": {
+      "unread": {
+        "name": "안 읽은 알림"
+      },
+      "orders_active": {
+        "name": "진행 중 주문"
+      },
+      "bids_waiting": {
+        "name": "내 의뢰에 온 입찰"
+      },
+      "my_bids": {
+        "name": "내 입찰 대기"
+      },
+      "jobs_open": {
+        "name": "열린 제작 의뢰"
+      },
+      "filament_total": {
+        "name": "필라멘트 롤"
+      },
+      "filament_low": {
+        "name": "조금 남은 필라멘트"
+      },
+      "filament_empty": {
+        "name": "다 쓴 필라멘트"
+      },
+      "box": {
+        "name": "보관함 {name}"
+      }
+    }
   }
 }

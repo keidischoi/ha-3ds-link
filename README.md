@@ -112,6 +112,18 @@ Choose **⚡ Find and connect automatically** at the top: Home Assistant devices
 To attach more printers / equipment, start again from step 3 (address and code are pre-filled).
 To change sensors or alert thresholds, press **Configure** on the integration. Deleting the integration also deletes its devices on the site.
 
+## Site → Home Assistant sensors (0.5.0+)
+
+Needs the site's IoT link plugin **1.19.0+**. Every 5 minutes the integration reads your account's status from the site and shows it as sensors on a **3DSSync — <site>** device:
+
+- Unread notices (attributes: last notice, time)
+- Orders in progress
+- Bids on my requests · My pending bids · Open print requests
+- Filament rolls · Filament running low (attribute: low_list) · Filament used up
+- One sensor per storage box: rolls inside (attributes: low, humidity, temp, humidity_max, over)
+
+Use them in automations — e.g. notify your phone when *Bids on my requests* goes up, or when a box's `over` becomes true. No personal data (names, addresses, phone numbers) is sent. If several entries use the same link code, only one set of sensors is made. New storage boxes appear after reloading the integration.
+
 ## Printer integrations
 
 Any printer integration works — this integration only **reads the sensors that integration creates and sends them**.

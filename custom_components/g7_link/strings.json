@@ -123,5 +123,36 @@
       "invalid_code": "The link code is not valid. Copy it again from the site.",
       "cannot_connect": "Cannot reach the site. Check the address."
     }
+  },
+  "entity": {
+    "sensor": {
+      "unread": {
+        "name": "Unread notices"
+      },
+      "orders_active": {
+        "name": "Orders in progress"
+      },
+      "bids_waiting": {
+        "name": "Bids on my requests"
+      },
+      "my_bids": {
+        "name": "My pending bids"
+      },
+      "jobs_open": {
+        "name": "Open print requests"
+      },
+      "filament_total": {
+        "name": "Filament rolls"
+      },
+      "filament_low": {
+        "name": "Filament running low"
+      },
+      "filament_empty": {
+        "name": "Filament used up"
+      },
+      "box": {
+        "name": "Box {name}"
+      }
+    }
   }
 }
